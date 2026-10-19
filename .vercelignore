@@ -1,0 +1,24 @@
+# Vercel CLI로 직접 배포할 때 올리지 않는 파일 (.gitignore와 같은 기준)
+node_modules
+dist
+.vercel
+.env*
+backup/
+.claude/
+*.log
+
+# 디자인 레퍼런스 이미지 (배포 페이지는 사용하지 않음)
+public/design/*
+!public/design/.gitkeep
+
+# 3D 모델: 실제 페이지가 쓰는 8개만
+public/models/*
+!public/models/.gitkeep
+!public/models/chair-001-keyshot-all-materials-merged.glb
+!public/models/chair-002.glb
+!public/models/chair-003-textured.glb
+!public/models/chair-004.glb
+!public/models/chair-005-keyshot-optimized.glb
+!public/models/chair-005.glb
+!public/models/chair-006.glb
+!public/models/chair-007-seat-angled.glb

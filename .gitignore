@@ -31,3 +31,6 @@ public/models/*
 !public/models/chair-005.glb
 !public/models/chair-006.glb
 !public/models/chair-007-seat-angled.glb
+
+.vercel
+.env*
