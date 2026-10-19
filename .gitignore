@@ -1,0 +1,33 @@
+node_modules
+dist
+.DS_Store
+*.log
+
+# ---------- 배포(GitHub · Vercel)에 올리지 않는 로컬 전용 파일 ----------
+# 파일은 로컬에 그대로 남고, Git에만 포함되지 않는다.
+
+# 작업 중 만든 백업
+backup/
+
+# Claude Code 로컬 설정 (개발 서버 실행 설정)
+.claude/
+
+# Vercel CLI 로컬 연결 정보
+.vercel
+
+# 디자인 레퍼런스 이미지 (개발용 비교 오버레이 ?compare 에서만 사용, 배포 페이지는 사용하지 않음)
+public/design/*
+!public/design/.gitkeep
+
+# 3D 모델: 실제 페이지가 쓰는 8개만 올린다 (src/data/chair-details.js 기준)
+# 나머지는 테스트·KeyShot 원본 파일 (chair-005 keyshot final.glb 245MB는 GitHub 파일 한도 100MB 초과)
+public/models/*
+!public/models/.gitkeep
+!public/models/chair-001-keyshot-all-materials-merged.glb
+!public/models/chair-002.glb
+!public/models/chair-003-textured.glb
+!public/models/chair-004.glb
+!public/models/chair-005-keyshot-optimized.glb
+!public/models/chair-005.glb
+!public/models/chair-006.glb
+!public/models/chair-007-seat-angled.glb

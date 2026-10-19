@@ -1,0 +1,150 @@
+/*
+ * MAIN 페이지 (public/design/main.webp 기준)
+ * 위치: 가로는 화면 너비, 세로는 화면 높이에 대한 비율
+ * 크기: 디자인 단위 --u (tokens.css)
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 메인 화면과 CHAIR DNA 화면은 같은 자리에 겹친 풀스크린 화면. 스크롤 대신 전환(main-sections.js) */
+body[data-page='main'] {
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: pinch-zoom; /* 세로 스와이프는 브라우저 스크롤 대신 화면 전환으로 */
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* 첫 화면: viewport 전체를 채우는 무대 (아래로 스크롤하면 CHAIR DNA 화면으로 전환) */
+.main-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: var(--color-bg);
+}
+
+.chair-field {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------- 의자 ---------- */
+
+/* 1층: 위치 (디자인 좌표의 중심점) */
+.chair {
+  position: absolute;
+  left: calc(var(--cx) / var(--design-w) * 100%);
+  top: calc(var(--cy) / var(--design-h) * 100%);
+  width: calc(var(--u) * var(--w));
+  height: calc(var(--u) * var(--h));
+  margin-left: calc(var(--u) * var(--w) / -2);
+  margin-top: calc(var(--u) * var(--h) / -2);
+  z-index: 1;
+  pointer-events: none; /* 클릭·hover는 PNG 불투명 영역 기준으로 main.js가 판정 */
+}
+
+.chair.is-leaving {
+  z-index: 2; /* 축소되는 동안에도 다른 의자 위 */
+}
+
+.chair.is-hovered {
+  z-index: 3;
+}
+
+/* 2층: hover 확대 (GSAP back.out 바운스, main.js) */
+.chair__hover {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+/* 3층: floating (GSAP이 y를 움직인다) */
+.chair__float {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.chair__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* 그림자: 실제 의자 바닥(alpha 영역 하단) 중앙에 놓인 옅은 타원 */
+.chair__shadow {
+  position: absolute;
+  left: var(--shadow-x);
+  top: var(--shadow-y);
+  width: var(--shadow-w);
+  height: calc(var(--u) * 16);
+  margin-left: calc(var(--shadow-w) / -2);
+  margin-top: calc(var(--u) * -8);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0));
+  filter: blur(calc(var(--u) * 5));
+  will-change: transform, opacity;
+}
+
+.chair:focus-visible {
+  outline: 1px solid var(--color-text);
+  outline-offset: 4px;
+}
+
+/* ---------- 라벨 ---------- */
+
+.chair-label {
+  position: absolute;
+  left: calc(var(--cx) / var(--design-w) * 100% + var(--u) * var(--lx));
+  top: calc(var(--cy) / var(--design-h) * 100% + var(--u) * var(--ly));
+  z-index: 10; /* 확대된 의자가 텍스트를 가리지 않게 항상 위 */
+  margin: 0;
+  font-size: calc(var(--u) * 15);
+  line-height: calc(var(--u) * 16);
+  letter-spacing: var(--tracking);
+  word-spacing: calc(var(--u) * 1);
+  white-space: pre;
+  pointer-events: none;
+}
+
+/* ---------- 하단 문구 ---------- */
+
+.main-footer {
+  position: absolute;
+  bottom: calc(var(--u) * 17.3);
+  margin: 0;
+  font-size: calc(var(--u) * 20);
+  line-height: 1;
+  letter-spacing: var(--tracking);
+  white-space: nowrap;
+}
+
+.main-footer--left {
+  left: calc(var(--u) * 22);
+}
+
+.main-footer--right {
+  right: calc(var(--u) * 20);
+}

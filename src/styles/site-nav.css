@@ -1,0 +1,37 @@
+/* 공통 네비게이션: 상단 좌·중앙·우 텍스트 */
+.site-nav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 100;
+  height: calc(var(--u) * 56);
+  pointer-events: none;
+  font-family: var(--font-sans);
+  font-size: calc(var(--u) * 20);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: var(--tracking);
+  color: var(--color-text);
+}
+
+.site-nav__item {
+  position: absolute;
+  top: calc(var(--u) * 18.7);
+  margin: 0;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.site-nav__item--left {
+  left: calc(var(--u) * 21);
+}
+
+.site-nav__item--center {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.site-nav__item--right {
+  right: calc(var(--u) * 20);
+}

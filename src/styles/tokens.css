@@ -1,0 +1,19 @@
+@import 'pretendard/dist/web/static/Pretendard-Light.css';
+@import 'pretendard/dist/web/static/Pretendard-Regular.css';
+
+/*
+ * 디자인 토큰 (Figma MAIN 프레임 2000 × 1293 기준)
+ * --u: 디자인 1px을 화면 크기에 맞춰 환산한 단위.
+ * 화면 비율이 디자인과 같으면 원본과 1:1 비율로 보인다.
+ */
+:root {
+  --design-w: 2000;
+  --design-h: 1293;
+  --u: min(calc(100vw / 2000), calc(100vh / 1293));
+
+  --color-bg: #ffffff;
+  --color-text: #000000;
+
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --tracking: -0.085em; /* Pretendard 20px 기준, 디자인 글자 폭에 맞춘 값 */
+}

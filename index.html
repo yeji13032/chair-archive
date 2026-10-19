@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CHAIR ARCHIVE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400&display=swap"
+    />
+  </head>
+  <body data-page="main">
+    <header data-site-nav></header>
+
+    <main class="main-stage">
+      <h1 class="visually-hidden">CHAIR ARCHIVE</h1>
+      <div class="chair-field" data-chair-field></div>
+
+      <p class="main-footer main-footer--left">A STUDY OF EVERYDAY OBJECTS</p>
+      <p class="main-footer main-footer--right">SELECT AN OBJECT TO EXPLORE</p>
+    </main>
+
+    <!-- CHAIR DNA: 의자를 끌어 공통점(FORM / MATERIAL / STRUCTURE)을 가진 의자끼리 연결해 보는 섹션 -->
+    <section class="dna" data-dna inert aria-label="Chair DNA — drag the chairs to find what they share">
+      <svg class="dna__lines" data-dna-svg aria-hidden="true"></svg>
+      <div class="dna__overlays" data-dna-overlays aria-hidden="true"></div>
+      <div class="dna__bubbles" data-dna-bubbles></div>
+      <div class="dna__labels" data-dna-labels aria-live="polite"></div>
+      <p class="dna__footer">EVERY CHAIR HAS A CONNECTION</p>
+    </section>
+
+    <script type="module" src="/src/pages/main.js"></script>
+  </body>
+</html>

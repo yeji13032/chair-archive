@@ -1,0 +1,211 @@
+/*
+ * ABOUT 페이지 (public/design/about-01.webp, about-02.png 기준)
+ * 두 디자인 모두 너비 1728 프레임 기준이므로 --v = 화면 너비 / 1728.
+ * 텍스트는 Figma 기준선(baseline) 좌표(--base)로 배치한다.
+ * 화면 전환(SCATTER & REVEAL)은 about.js의 GSAP ScrollTrigger가 담당한다.
+ */
+:root {
+  --v: calc(100vw / 1728);
+  --about-hover: #c6ff33; /* Hover 라임 */
+  --about-hover-speed: 0.25s;
+
+  /* Pretendard 세로 메트릭: line-height = font-size일 때 위쪽 끝에서 기준선까지 0.855em */
+  --font-ascent: 0.95;
+  --font-content: 1.19;
+}
+
+html:has(body[data-page='about']) {
+  overflow-x: hidden;
+  scrollbar-width: none; /* 스크롤바 폭만큼 화면이 좁아져 디자인 좌표가 어긋나지 않게 */
+}
+
+html:has(body[data-page='about'])::-webkit-scrollbar {
+  display: none;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body[data-page='about'] {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 스크롤 동안 고정(pin)되는 한 화면짜리 무대. 두 화면이 겹쳐 있다. */
+.about-stage {
+  position: relative;
+  height: 100vh;
+  overflow: hidden; /* 흩어지는 단어가 가로 스크롤을 만들지 않게 */
+}
+
+/* ---------- 첫 번째 화면: 흩어진 큰 단어 ---------- */
+
+.about-words {
+  --size: 96; /* Figma 1728 프레임 기준 글자 크기 */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(var(--v) * 2129.4);
+  will-change: transform;
+}
+
+.about-word {
+  position: absolute;
+  left: calc(var(--v) * var(--x));
+  top: calc(var(--v) * (var(--base) - var(--size) * (var(--font-ascent) - (var(--font-content) - 1) / 2)));
+  font-size: calc(var(--v) * var(--size));
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  white-space: nowrap;
+  color: #000000;
+  transition: color var(--about-hover-speed) ease;
+}
+
+/* 같은 글자를 정확히 겹친 복제 레이어: 글자 획 안쪽 그림자만 그린다 (SVG 필터 #about-inner-shadow).
+   평소에는 투명, Hover 때만 서서히 나타난다. 크기·위치·굵기는 원래 글자와 같다. */
+.about-word::after {
+  content: attr(data-word);
+  position: absolute;
+  inset: 0;
+  color: var(--about-hover);
+  filter: url(#about-inner-shadow);
+  opacity: 0;
+  transition: opacity var(--about-hover-speed) ease;
+  pointer-events: none;
+}
+
+.about-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* Hover: 라임 + 안쪽 그림자. 괄호 ( )는 아래 공통 영역 하나로 함께 반응한다. */
+.about-word:hover,
+.about-words:has(.about-paren-zone:hover) .about-word:is([data-word='('], [data-word=')']) {
+  color: var(--about-hover);
+}
+
+.about-word:hover::after,
+.about-words:has(.about-paren-zone:hover) .about-word:is([data-word='('], [data-word=')'])::after {
+  opacity: 1;
+}
+
+/* 괄호 ( )와 그 사이 의자를 덮는 하나의 Hover 영역 (about.js가 위치를 맞춘다). 보이지 않는다. */
+.about-paren-zone {
+  position: absolute;
+}
+
+/* ---------- 두 번째 화면: 작은 타이포그래피 ---------- */
+
+.about-info {
+  --size: 15;
+  --lh: 15;
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* 아래 단어의 hover를 막지 않게 */
+  font-size: calc(var(--v) * var(--size));
+  font-weight: 300;
+  line-height: calc(var(--v) * var(--lh));
+  letter-spacing: -0.025em;
+}
+
+/* 세로 위치는 1117 프레임 높이에 대한 비율, 가로는 --v */
+.about-info > * {
+  position: absolute;
+  margin: 0;
+  top: calc(
+    var(--base) / 1117 * 100% -
+      var(--v) * ((var(--lh) - var(--size) * var(--font-content)) / 2 + var(--size) * var(--font-ascent))
+  );
+  left: calc(var(--v) * var(--x));
+  font: inherit;
+  white-space: nowrap;
+  opacity: 0; /* 등장 전 상태. 스크롤에 따라 about.js가 나타나게 한다 */
+}
+
+.about-info strong {
+  font-weight: 400;
+}
+
+.about-info__title {
+  font-weight: 400;
+}
+
+.about-info__title-rest {
+  position: absolute;
+  left: calc(var(--v) * 72); /* 'The Visible Form'은 x 91에서 시작 */
+}
+
+.about-info__tagline,
+.about-info__body {
+  --lh: 14.5;
+}
+
+.about-info__tagline {
+  left: auto;
+  right: calc(var(--v) * var(--right));
+  text-align: right;
+}
+
+/* ---------- 괄호 ( ) 사이 의자 전환 ---------- */
+/* 레퍼런스(about-01-chair-cycle) 기준: 괄호 안쪽 x 1295~1451의 가운데, 의자 바닥선 y 827.
+   모든 의자가 같은 영역(120 × 144) 안에서 같은 바닥선에 서고, 투명 여백을 뺀 실제 모양의 중심이 가운데에 온다. */
+.about-chair-cycle {
+  --box-x: 1313;
+  --box-y: 683.3;
+  --box-w: 120;
+  --box-h: 144;
+  position: absolute;
+  left: calc(var(--v) * var(--box-x));
+  top: calc(var(--v) * var(--box-y));
+  width: calc(var(--v) * var(--box-w));
+  height: calc(var(--v) * var(--box-h));
+  pointer-events: none;
+}
+
+/* 크기·위치는 영역에 대한 비율(%)로 about.js가 정한다 → 영역 크기가 바뀌어도(작은 화면) 같은 구도 */
+.about-chair-cycle__img {
+  position: absolute;
+  left: var(--img-x);
+  top: var(--img-y);
+  width: var(--img-w);
+  height: auto;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  user-select: none;
+}
+
+.about-chair-cycle__img.is-active {
+  opacity: 1;
+}
+
+/* ---------- 작은 화면: 단어가 겹치지 않도록 390 기준 별도 배치 ---------- */
+@media (max-width: 768px) {
+  .about-words {
+    --v: calc(100vw / 390);
+    --size: 60;
+    height: calc(var(--v) * 1040);
+  }
+
+  .about-word {
+    left: calc(var(--v) * var(--mx));
+    top: calc(var(--v) * (var(--mbase) - var(--size) * (var(--font-ascent) - (var(--font-content) - 1) / 2)));
+  }
+
+  .about-chair-cycle {
+    --box-x: 237;
+    --box-y: 382;
+    --box-w: 80;
+    --box-h: 96;
+  }
+}

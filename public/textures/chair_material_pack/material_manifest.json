@@ -1,0 +1,198 @@
+{
+  "version": 1,
+  "status": "provisional without original GLB files",
+  "materials": {
+    "fabric_blue": {
+      "path": "fabric_blue",
+      "baseColor": "fabric_blue/baseColor.png",
+      "normal": "fabric_blue/normalGL.png",
+      "roughness": "fabric_blue/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.83,
+      "normalScale": 0.42
+    },
+    "fabric_beige": {
+      "path": "fabric_beige",
+      "baseColor": "fabric_beige/baseColor.png",
+      "normal": "fabric_beige/normalGL.png",
+      "roughness": "fabric_beige/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.85,
+      "normalScale": 0.36
+    },
+    "fabric_anthracite": {
+      "path": "fabric_anthracite",
+      "baseColor": "fabric_anthracite/baseColor.png",
+      "normal": "fabric_anthracite/normalGL.png",
+      "roughness": "fabric_anthracite/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.83,
+      "normalScale": 0.4
+    },
+    "leather_black": {
+      "path": "leather_black",
+      "baseColor": "leather_black/baseColor.png",
+      "normal": "leather_black/normalGL.png",
+      "roughness": "leather_black/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.64,
+      "normalScale": 0.24
+    },
+    "birch_clear_lacquer": {
+      "path": "birch_clear_lacquer",
+      "baseColor": "birch_clear_lacquer/baseColor.png",
+      "normal": "birch_clear_lacquer/normalGL.png",
+      "roughness": "birch_clear_lacquer/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.42,
+      "normalScale": 0.13
+    },
+    "metal_powder_black": {
+      "path": "metal_powder_black",
+      "baseColor": "metal_powder_black/baseColor.png",
+      "normal": "metal_powder_black/normalGL.png",
+      "roughness": "metal_powder_black/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.72,
+      "normalScale": 0.13
+    },
+    "metal_powder_yellow": {
+      "path": "metal_powder_yellow",
+      "baseColor": "metal_powder_yellow/baseColor.png",
+      "normal": "metal_powder_yellow/normalGL.png",
+      "roughness": "metal_powder_yellow/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.56,
+      "normalScale": 0.1
+    },
+    "metal_powder_blue": {
+      "path": "metal_powder_blue",
+      "baseColor": "metal_powder_blue/baseColor.png",
+      "normal": "metal_powder_blue/normalGL.png",
+      "roughness": "metal_powder_blue/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.58,
+      "normalScale": 0.1
+    },
+    "metal_brushed_silver": {
+      "path": "metal_brushed_silver",
+      "baseColor": "metal_brushed_silver/baseColor.png",
+      "normal": "metal_brushed_silver/normalGL.png",
+      "roughness": "metal_brushed_silver/roughness.png",
+      "metalness": 1,
+      "roughnessFactor": 0.3,
+      "normalScale": 0.18
+    },
+    "plastic_matte_black": {
+      "path": "plastic_matte_black",
+      "baseColor": "plastic_matte_black/baseColor.png",
+      "normal": "plastic_matte_black/normalGL.png",
+      "roughness": "plastic_matte_black/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.65,
+      "normalScale": 0.08
+    },
+    "plastic_gloss_white": {
+      "path": "plastic_gloss_white",
+      "baseColor": "plastic_gloss_white/baseColor.png",
+      "normal": "plastic_gloss_white/normalGL.png",
+      "roughness": "plastic_gloss_white/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.29,
+      "normalScale": 0.04
+    },
+    "wood_painted_red": {
+      "path": "wood_painted_red",
+      "baseColor": "wood_painted_red/baseColor.png",
+      "normal": "wood_painted_red/normalGL.png",
+      "roughness": "wood_painted_red/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.43,
+      "normalScale": 0.05
+    },
+    "wood_painted_black": {
+      "path": "wood_painted_black",
+      "baseColor": "wood_painted_black/baseColor.png",
+      "normal": "wood_painted_black/normalGL.png",
+      "roughness": "wood_painted_black/roughness.png",
+      "metalness": 0,
+      "roughnessFactor": 0.5,
+      "normalScale": 0.06
+    },
+    "polycarbonate_clear": {
+      "color": "#ffffff",
+      "metalness": 0,
+      "roughnessFactor": 0.065,
+      "transmission": 0.95,
+      "thickness": 0.35,
+      "ior": 1.585,
+      "note": "Needs proper thickness and environment lighting. Do not use opacity-only fake glass."
+    },
+    "chrome_plated": {
+      "color": "#d9dadd",
+      "metalness": 1,
+      "roughnessFactor": 0.115,
+      "note": "Requires HDRI for convincing reflection; avoid adding a noisy photo texture."
+    }
+  },
+  "chairs": {
+    "001": {
+      "model": "IKEA PS 2026 (verify exact product / finish)",
+      "parts": {
+        "colored shell or structure": "metal_powder_yellow"
+      },
+      "verification": "Product variant and object part labels unverified"
+    },
+    "002": {
+      "model": "POÄNG",
+      "parts": {
+        "wood frame": "birch_clear_lacquer",
+        "fabric cushion (if cloth)": "fabric_beige",
+        "leather cushion (if black leather)": "leather_black"
+      },
+      "verification": "Use ONLY matching cushion variant; beige fabric and black leather are alternatives"
+    },
+    "003": {
+      "model": "Blue chair (unidentified)",
+      "parts": {
+        "Blue Roll if woven textile": "fabric_blue"
+      },
+      "verification": "Blue Roll actual material and rest of parts unknown; do not auto-assign"
+    },
+    "004": {
+      "model": "DALFRED (pending model verification)",
+      "parts": {
+        "painted frame": "metal_powder_black",
+        "seat (if black stained wood)": "wood_painted_black"
+      },
+      "verification": "Confirm exact variant and whether seat is solid wood"
+    },
+    "005": {
+      "model": "TOBIAS (tentative)",
+      "parts": {
+        "transparent shell": "polycarbonate_clear",
+        "chrome steel legs": "chrome_plated",
+        "rubber feet": "plastic_matte_black"
+      },
+      "verification": "Model identification tentative"
+    },
+    "006": {
+      "model": "SKÅLBODA",
+      "parts": {
+        "wire frame and legs": "metal_powder_black",
+        "plastic fittings": "plastic_matte_black"
+      },
+      "verification": "Mesh geometry must be modeled; a mesh-pattern texture cannot substitute actual open wire"
+    },
+    "007": {
+      "model": "IKEA PS 2026 folding chair (variant dependent)",
+      "parts": {
+        "birch wooden parts": "birch_clear_lacquer",
+        "blue painted wood": "metal_powder_blue",
+        "black painted wood": "wood_painted_black",
+        "red painted wood": "wood_painted_red"
+      },
+      "verification": "Blue painted wood uses generic painted coating look; customize finish and choose part colors against reference"
+    }
+  }
+}

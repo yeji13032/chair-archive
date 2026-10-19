@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DETAIL — CHAIR ARCHIVE</title>
+  </head>
+  <body data-page="detail">
+    <header data-site-nav></header>
+
+    <main class="detail">
+      <!-- 왼쪽: 3D 모델 -->
+      <div class="detail-view" data-detail-view>
+        <canvas class="detail-view__canvas" data-detail-canvas></canvas>
+      </div>
+
+      <!-- 오른쪽: 설명 · 제품명 · 컬러 · 버튼 -->
+      <section class="detail-info">
+        <div class="detail-info__column">
+          <div class="detail-desc">
+            <h2 class="detail-desc__heading">COMPOSITION, FORM &amp; MATERIAL</h2>
+            <p class="detail-desc__body" data-field="composition"></p>
+            <dl class="detail-materials" data-field="materials"></dl>
+          </div>
+
+          <h1 class="detail-info__name" data-field="name"></h1>
+          <p class="detail-info__credit" data-field="credit"></p>
+
+          <ul class="detail-swatches" data-field="swatches"></ul>
+        </div>
+
+        <div class="detail-actions">
+          <button class="detail-action" type="button" data-action="show-structure">SHOW STRUCTURE</button>
+          <button class="detail-action" type="button" data-action="return-to-form">RETURN TO FORM</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/pages/detail.js"></script>
+  </body>
+</html>

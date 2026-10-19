@@ -1,0 +1,70 @@
+// 의자 데이터. 좌표는 Figma MAIN 프레임(2000 × 1293) 기준 px.
+// box: 의자 PNG가 놓이는 영역, label: 라벨 텍스트 상자의 좌상단,
+// alpha: PNG 원본에서 실제 의자가 차지하는 영역(그림자 위치 계산용).
+export const chairs = [
+  {
+    id: '001',
+    label: ['PS LOUNGE', 'CHAIR  /  001', '2026'],
+    image: '/images/chair-001.png',
+    size: [562, 548],
+    alpha: [74, 58, 467, 480],
+    box: { x: 147.1, y: 122.4, w: 325.4, h: 317.3 },
+    labelAt: { x: 145, y: 173.5 },
+  },
+  {
+    id: '002',
+    label: ['DALFRED', 'CHAIR  /  002', '2014'],
+    image: '/images/chair-002.png',
+    size: [375, 542],
+    alpha: [11, 43, 294, 523],
+    box: { x: 261.6, y: 580, w: 217.6, h: 314.6 },
+    labelAt: { x: 255, y: 599.5 },
+  },
+  {
+    id: '003',
+    label: ['PS Knäbäck', 'CHAIR  /  003', '2026'],
+    image: '/images/chair-003.png',
+    size: [377, 482],
+    alpha: [87, 35, 309, 444],
+    box: { x: 766.4, y: 327.6, w: 219.2, h: 280.3 },
+    labelAt: { x: 826, y: 598.5 },
+  },
+  {
+    id: '004',
+    label: ['SKÅLBODA', 'JÄRPEN  /  004', '1983'],
+    image: '/images/chair-004.png',
+    size: [569, 557],
+    alpha: [70, 48, 502, 500],
+    box: { x: 623.4, y: 884.1, w: 330.2, h: 323.2 },
+    labelAt: { x: 616, y: 929.5 },
+  },
+  {
+    id: '005',
+    label: ['PS LOUNGE', 'CHAIR  /  005', '2026'],
+    image: '/images/chair-005.png',
+    size: [459, 455],
+    alpha: [51, 27, 397, 414],
+    box: { x: 1266.5, y: 515.4, w: 265.5, h: 263.2 },
+    labelAt: { x: 1291, y: 527.5 },
+  },
+  {
+    id: '006',
+    label: ['POÄNG', 'Nytillverkad  /  006', '1977'],
+    image: '/images/chair-006.png',
+    size: [485, 490],
+    alpha: [67, 55, 434, 426],
+    box: { x: 1481.1, y: 148, w: 281.9, h: 284.8 },
+    labelAt: { x: 1724, y: 178.5 },
+  },
+  {
+    id: '007',
+    label: ['PS FOLDING', 'CHAIR  /  007', '2026'],
+    image: '/images/chair-007.png',
+    size: [374, 503],
+    alpha: [27, 32, 362, 453],
+    box: { x: 1667.4, y: 867.5, w: 216.7, h: 291.4 },
+    labelAt: { x: 1678, y: 882.5 },
+  },
+];
+
+export const detailHref = (id) => `/detail/${id}`;

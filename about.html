@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ABOUT — CHAIR ARCHIVE</title>
+  </head>
+  <body data-page="about">
+    <header data-site-nav></header>
+
+    <main class="about">
+      <div class="about-stage" data-about-stage>
+        <!-- 첫 번째 화면: about-01 -->
+        <!-- 글자 획 안쪽에만 생기는 은은한 그림자 (Hover 시 겹쳐지는 복제 글자 레이어에 쓰인다) -->
+        <svg class="about-filters" width="0" height="0" aria-hidden="true" focusable="false">
+          <filter id="about-inner-shadow" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+            <!-- 글자 바깥(알파 반전)을 오른쪽 아래로 밀고 흐리게 → 글자 안쪽 위·왼쪽 가장자리로 스며든 부분만 남긴다 -->
+            <feComponentTransfer in="SourceAlpha" result="outside">
+              <feFuncA type="table" tableValues="1 0" />
+            </feComponentTransfer>
+            <feOffset in="outside" dx="1.2" dy="1.8" result="shifted" />
+            <feGaussianBlur in="shifted" stdDeviation="1.4" result="blurred" />
+            <feFlood flood-color="#8db51f" flood-opacity="0.6" />
+            <feComposite in2="blurred" operator="in" result="shadow" />
+            <feComposite in="shadow" in2="SourceAlpha" operator="in" />
+          </filter>
+        </svg>
+        <section class="about-words" aria-label="Beyond the visible form">
+          <span class="about-word" data-word="The" style="--x: 938; --base: 187.4; --mx: 236; --mbase: 150">The</span>
+          <span class="about-word" data-word="Beyond" style="--x: 54.8; --base: 402.5; --mx: 16; --mbase: 250">Beyond</span>
+          <span class="about-word" data-word="Visible" style="--x: 507.9; --base: 596.2; --mx: 120; --mbase: 350">Visible</span>
+          <span class="about-word" data-word="(" style="--x: 1266.4; --base: 798.5; --mx: 210; --mbase: 470">(</span>
+          <span class="about-word" data-word=")" style="--x: 1448.2; --base: 798.5; --mx: 330; --mbase: 470">)</span>
+          <span class="about-word" data-word="Form" style="--x: 275.1; --base: 1096.6; --mx: 24; --mbase: 600">Form</span>
+          <span class="about-word" data-word="Structure" style="--x: 1085.2; --base: 1247.8; --mx: 140; --mbase: 710">Structure</span>
+          <span class="about-word" data-word="Explore" style="--x: 522.2; --base: 1566.1; --mx: 40; --mbase: 830">Explore</span>
+          <span class="about-word" data-word="More" style="--x: 1452; --base: 1745.1; --mx: 240; --mbase: 940">More</span>
+        </section>
+
+        <!-- 두 번째 화면: about-02 -->
+        <section class="about-info">
+          <h1 class="about-info__title" style="--x: 19; --base: 275.5">
+            <span>Beyond</span><span class="about-info__title-rest">The Visible Form</span>
+          </h1>
+          <p class="about-info__keywords" style="--x: 19; --base: 290.5">Form / Structure / Interaction</p>
+          <p class="about-info__year" style="--x: 19; --base: 352.5">2026</p>
+          <p class="about-info__tagline" style="--right: 18; --base: 450.5">An Interactive<br />Study Of Chairs</p>
+          <p class="about-info__body" style="--x: 19; --base: 946.5">
+            An exploration of <strong>form, structure, and the objects</strong> we live with.<br />
+            Behind its familiar form lies a structure of <strong>individual components, connections, and design decisions.</strong><br />
+            This archive invites you to explore chairs <strong>beyond their surfaces,</strong> revealing how each object is constructed.
+          </p>
+          <p class="about-info__closing" style="--x: 19; --base: 1071.7">A chair is <strong>more than</strong> what we see.</p>
+        </section>
+      </div>
+    </main>
+
+    <script type="module" src="/src/pages/about.js"></script>
+  </body>
+</html>
