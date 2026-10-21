@@ -5,6 +5,8 @@
 // view.azimuth / elevation: 카메라가 모델을 바라보는 각도(도). 디자인 사진의 구도에 맞춘 값.
 // render: 의자별 렌더링 밝기. exposure = 톤매핑 노출(디자인 사진의 평균 밝기에 맞춰 측정한 값), environment = 환경광(반사) 강도,
 //   keyLight = 입체감·그림자용 키 라이트 강도. 의자마다 렌더러가 따로 있어 값이 서로 영향을 주지 않는다.
+//   부품끼리 드리우는 그림자: selfShadow(세기 0~1) · shadowSoftness(번짐), 접촉 그림자: ao(세기) · aoRadius(번지는 거리)
+//   — 프레임이 많은 의자(004·006·007)는 또렷하게, 패브릭(001·003)·합판 면(005)은 부드럽게. 없으면 chair-viewer.js 기본값
 export const chairDetails = {
   '001': {
     name: 'PS LOUNGE CHAIR',
@@ -32,7 +34,7 @@ export const chairDetails = {
     structure: 'INFLATABLE CUSHIONS / STEEL FRAME',
     model: '/models/chair-001-keyshot-all-materials-merged.glb', // KeyShot 패브릭·크롬 재질 (구조·부품·분해값은 chair-001.glb와 동일, 이전 파일들은 보존)
     view: { box: [345, 265, 1078, 955], azimuth: 26, elevation: 11 },
-    render: { exposure: 0.83, environment: 0.9, keyLight: 1.0 },
+    render: { exposure: 0.83, environment: 0.9, keyLight: 1.0, selfShadow: 0.6, shadowSoftness: 8 },
     explode: { distance: 1, duration: 2 }, // 분해 거리 배율(GLB 분해값 기준)·시간(초)
   },
   '002': {
@@ -90,7 +92,7 @@ export const chairDetails = {
     structure: 'FOUR LEGS / ROUND SEAT / CYLINDRICAL BACKREST',
     model: '/models/chair-003-textured.glb',
     view: { box: [491, 210, 907, 964], azimuth: 30, elevation: 24 },
-    render: { exposure: 1.14, environment: 0.75, keyLight: 1.4 },
+    render: { exposure: 1.14, environment: 0.75, keyLight: 1.4, selfShadow: 0.6, shadowSoftness: 8 },
   },
   '004': {
     name: 'SKÅLBODA',
@@ -115,7 +117,8 @@ export const chairDetails = {
     structure: 'WIRE GRID SHELL / STEEL LEGS',
     model: '/models/chair-004.glb',
     view: { box: [344, 277, 977, 934], azimuth: 60, elevation: 12 },
-    render: { exposure: 1.6, environment: 0.8, keyLight: 1.2 },
+    // exposure: 1.6에서 -0.2 EV (1.6 × 2^-0.2 ≈ 1.393). 톤매핑 노출만 낮춰 색상·채도·금속 반사의 관계는 그대로
+    render: { exposure: 1.393, environment: 0.8, keyLight: 1.2, selfShadow: 0.7, shadowSoftness: 5 },
   },
   '005': {
     name: 'PS LOUNGE CHAIR',
@@ -149,7 +152,8 @@ export const chairDetails = {
     model: '/models/chair-005-keyshot-optimized.glb',
     partSource: '/models/chair-005.glb',
     view: { box: [430, 225, 1038, 923], azimuth: 35, elevation: 12 },
-    render: { exposure: 1.37, environment: 0.85, keyLight: 1.1 },
+    // exposure: 1.37에서 -0.3 EV (1.37 × 2^-0.3 ≈ 1.113). 톤매핑 노출만 낮춰 나무색·나무결 대비·금속 연결부 재질은 그대로
+    render: { exposure: 1.113, environment: 0.85, keyLight: 1.1, selfShadow: 0.6, shadowSoftness: 8, ao: 0.65, aoRadius: 0.22 },
   },
   '006': {
     name: 'POÄNG',
@@ -179,7 +183,7 @@ export const chairDetails = {
     structure: 'CANTILEVER FRAME / SEAT / BACKREST',
     model: '/models/chair-006.glb',
     view: { box: [370, 260, 1041, 923], azimuth: 21, elevation: 9 },
-    render: { exposure: 0.93, environment: 0.75, keyLight: 1.4 },
+    render: { exposure: 0.93, environment: 0.75, keyLight: 1.4, selfShadow: 0.7, shadowSoftness: 5 },
   },
   '007': {
     name: 'PS FOLDING CHAIR',
@@ -212,7 +216,7 @@ export const chairDetails = {
     // 이전 단계 파일은 그대로 보존, 백업: backup/2026-10-19-chair-007/
     model: '/models/chair-007-seat-angled.glb',
     view: { box: [452, 192, 962, 978], azimuth: 25, elevation: 18 },
-    render: { exposure: 0.86, environment: 0.75, keyLight: 1.4 },
+    render: { exposure: 0.86, environment: 0.75, keyLight: 1.4, selfShadow: 0.7, shadowSoftness: 5 },
   },
 };
 

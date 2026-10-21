@@ -16,18 +16,26 @@ import '../styles/main-dna.css';
  * 물리 계산은 화면 픽셀 기준, 크기는 디자인 단위 u(메인 화면과 같은 min(너비/2000, 높이/1293))
  */
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const LIME = '#b5e61d';
-const REJECT_GREY = '#c4c4c4';
+// 버블: 미니멀한 평면 그래픽 (그림자 없음). 아주 연한 채움 + 얇은 라임 외곽선
+// 단일 버블·결합 blob 모두 같은 필터로 칠하므로 하나의 색으로 이어진다
+const FILL = '#f8ffe6'; // 기본: 의자가 잘 보이도록 존재감을 줄인 채움
+const FILL_MERGED = '#eefec6'; // 공통 DNA로 결합하면 이 색으로 서서히 진해진다
+const STROKE_COLOR = '#b8ff00';
+const STROKE_WIDTH = 2; // px
+const STROKE_WIDTH_HOT = 2.4; // hover · 드래그 · 끌려오는 중: 아주 살짝 굵게
 
 // 디자인 단위(2000 × 1292 프레임) 기준 값
-const STROKE = 2.5; // 외곽선 두께
-const STROKE_HOVER = 4;
 const GOO_BLUR = 15; // blob 연결부의 부드러움 (원끼리 이어지는 목 부분)
+const BRIDGE_WIDTH = 0.42; // 결합한 두 원 사이 점성 있는 연결부의 최대 굵기 (작은 원 반지름 대비)
 const REST_RATIO = 0.87; // 결합 상태의 중심 거리 = 지름 × 0.87 (레퍼런스 이미지 1)
 const MERGE_RATIO = 0.98; // 중심 거리가 지름 × 0.98보다 가까워지면 결합
 const BREAK_RATIO = 1.45; // 결합된 짝을 이 거리 이상 끌어당기면 분리
 const ATTRACT_GAP = 150; // 공통점이 있는 버블이 끌리기 시작하는 외곽선 사이 거리
 const COLLIDE_GAP = 8; // 공통점이 없는 버블 사이 최소 간격
+// 공통점 없는 버블에 부딪혔을 때 (reject): 부딪힌 버블은 크게 튕겨 나갔다가 제자리로 출렁이며 돌아오고, 잡은 버블은 크게 밀려난다
+const REJECT_IMPULSE = 1150; // 부딪힌 순간 한 번 주는 속도 (디자인 단위/초)
+const REJECT_KICK = 58; // 잡은 버블이 반대로 밀려나는 거리 (디자인 단위)
+const REJECT_COOLDOWN = 0.45; // 초: 이 시간 안에는 다시 튕기지 않는다 (계속 밀어도 한 번만)
 const FLOAT_AMP = 12; // 부유 진폭
 const BREATH = 0.025; // 원 크기의 미세한 숨쉬기(±2.5%)
 const APPEAR_SCALE = 0.95; // 등장·퇴장 시 버블(무리) 크기 0.95 ↔ 1
@@ -41,6 +49,27 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
 
   const defs = document.createElementNS(SVG_NS, 'defs');
   svg.append(defs);
+
+  // 엑스레이 톤 (CSS filter: url(#dna-xray-mint) 등으로 의자 이미지에 적용)
+  // 의자의 어두운 부분일수록 진하게(구조가 드러나게), 밝은 부분도 옅게 남기고, 윤곽은 1px 선으로 또렷하게
+  for (const [name, body, edge] of [
+    ['mint', [0.5, 0.94, 0.84], '#18b48c'],
+    ['cyan', [0.62, 0.89, 0.96], '#2a9fc6'],
+  ]) {
+    const filter = document.createElementNS(SVG_NS, 'filter');
+    filter.id = `dna-xray-${name}`;
+    filter.setAttribute('color-interpolation-filters', 'sRGB');
+    filter.innerHTML = `
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 ${body[0]}  0 0 0 0 ${body[1]}  0 0 0 0 ${body[2]}  -0.3 -0.59 -0.11 0 1" result="dark" />
+      <feComponentTransfer in="dark" result="tone"><feFuncA type="linear" slope="0.6" intercept="0.22" /></feComponentTransfer>
+      <feComposite in="tone" in2="SourceAlpha" operator="in" result="body" />
+      <feMorphology in="SourceAlpha" operator="dilate" radius="1" result="grown" />
+      <feComposite in="grown" in2="SourceAlpha" operator="out" result="rim" />
+      <feFlood flood-color="${edge}" />
+      <feComposite in2="rim" operator="in" result="edge" />
+      <feMerge><feMergeNode in="body" /><feMergeNode in="edge" /></feMerge>`;
+    defs.append(filter);
+  }
 
   // ---------- 화면 단위 ----------
   let W = 0;
@@ -84,6 +113,8 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
       rejectUntil: 0,
       z: i,
       show: 0, // 등장 정도 0~1 (enter/leave가 GSAP으로 조절). 0이면 보이지 않는다
+      goo: 0, // 결합 정도 0~1: 다른 버블과 이어지는 동안 1로 부드럽게 (blob 연결부 흐림 정도)
+      lift: 0, // 들어 올림 0~1: hover · 드래그 · 끌려오는 중 (외곽선 두께)
       render: { x: 0, y: 0, k: 1, o: 0 }, // 마지막으로 그린 위치·크기·투명도
     };
     img.addEventListener('load', () => {
@@ -157,36 +188,19 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
     label.className = 'dna-label';
     label.innerHTML = `<span class="dna-label__count">${shared.count} / 3 SHARED${shared.count === 3 ? ' — STRONG MATCH' : ''}</span>${keywordHtml(shared.keywords)}`;
     labelLayer.append(label);
-    let overlay = null;
-    if (shared.count === 3) {
-      overlay = document.createElement('div');
-      overlay.className = 'dna-overlay';
-      for (const c of [a, b]) {
-        const im = document.createElement('img');
-        im.className = 'dna-overlay__img';
-        im.src = c.src;
-        im.alt = '';
-        im.dataset.id = c.id;
-        overlay.append(im);
-      }
-      overlayLayer.append(overlay);
-    }
+    // 엑스레이·실루엣 겹침은 결합한 무리 단위로 그린다 (render → updateXrays)
     // x·y·alpha: 화면에 그려진 키워드 위치·투명도 (목표를 부드럽게 따라감), compact: 키워드를 세로로 쌓은 모양
-    const link = { a, b, shared, label, overlay, born: performance.now(), x: 0, y: 0, alpha: 0, compact: false, cand: -1 };
+    const link = { a, b, shared, label, born: performance.now(), x: 0, y: 0, alpha: 0, compact: false, cand: -1 };
     links.set(linkKey(a, b), link);
     // 결합되면 같은 위상으로 함께 떠다닌다
     b.phase = a.phase;
-    requestAnimationFrame(() => {
-      label.classList.add('is-visible');
-      overlay?.classList.add('is-visible');
-    });
+    requestAnimationFrame(() => label.classList.add('is-visible'));
   }
 
   function removeLink(key) {
     const link = links.get(key);
     if (!link) return;
     link.label.remove();
-    link.overlay?.remove();
     links.delete(key);
   }
 
@@ -208,8 +222,8 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
     return [...groups.values()];
   }
 
-  // ---------- SVG: 무리마다 gooey 외곽선 필터 ----------
-  // 채운 원들을 흐리게 → 투명도 임계값으로 하나의 덩어리 → 안쪽을 깎아 외곽선만 라임색으로
+  // ---------- SVG: 무리마다 gooey 채움 + 외곽선 필터 ----------
+  // 원들(+ 연결부)을 흐리게 → 투명도 임계값으로 하나의 덩어리 → 연한 색으로 채우고, 가장자리를 얇은 라임 선으로 (그림자 없음)
   const groupPool = [];
   function groupAt(i) {
     while (groupPool.length <= i) {
@@ -224,19 +238,24 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
       filter.innerHTML = `
         <feGaussianBlur in="SourceAlpha" stdDeviation="10" result="blur" />
         <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 26 -12" result="goo" />
-        <feMorphology in="goo" operator="erode" radius="2" result="inner" />
+        <feFlood flood-color="${FILL}" result="fillColor" />
+        <feComposite in="fillColor" in2="goo" operator="in" result="fill" />
+        <feMorphology in="goo" operator="erode" radius="${STROKE_WIDTH}" result="inner" />
         <feComposite in="goo" in2="inner" operator="out" result="ring" />
-        <feFlood flood-color="${LIME}" result="color" />
-        <feComposite in="color" in2="ring" operator="in" />`;
+        <feFlood flood-color="${STROKE_COLOR}" result="strokeColor" />
+        <feComposite in="strokeColor" in2="ring" operator="in" result="stroke" />
+        <feMerge><feMergeNode in="fill" /><feMergeNode in="stroke" /></feMerge>`;
       defs.append(filter);
       const g = document.createElementNS(SVG_NS, 'g');
       g.setAttribute('filter', `url(#${id})`);
       svg.append(g);
+      const [fill, stroke] = filter.querySelectorAll('feFlood');
       groupPool.push({
         g,
         blur: filter.querySelector('feGaussianBlur'),
+        fill,
+        stroke,
         erode: filter.querySelector('feMorphology'),
-        flood: filter.querySelector('feFlood'),
         circles: [],
       });
     }
@@ -431,11 +450,16 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
             m.vel.y += ny * sign * bounce * dt * 6;
           }
           if (dragged && shared.count === 0) {
-            a.rejectUntil = b.rejectUntil = t + 0.45;
-            // 잡은 버블은 반대쪽으로 살짝 밀렸다가 돌아오는 느낌
             const sign = dragged === a ? -1 : 1;
-            dragged.kick.x = nx * sign * 22 * u;
-            dragged.kick.y = ny * sign * 22 * u;
+            if (a.rejectUntil <= t && b.rejectUntil <= t) {
+              // 부딪힌 순간: 상대 버블을 크게 튕겨 내고, 잡은 버블도 반대쪽으로 크게 밀려나게
+              const other = dragged === a ? b : a;
+              other.vel.x -= nx * sign * REJECT_IMPULSE * u;
+              other.vel.y -= ny * sign * REJECT_IMPULSE * u;
+              dragged.kick.x = nx * sign * REJECT_KICK * u;
+              dragged.kick.y = ny * sign * REJECT_KICK * u;
+            }
+            a.rejectUntil = b.rejectUntil = t + REJECT_COOLDOWN;
           }
         }
       }
@@ -471,7 +495,36 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
   }
 
   // ---------- 그리기 ----------
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+  const hexRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const mixColor = (c1, c2, f) => {
+    const [p, q] = [hexRgb(c1), hexRgb(c2)];
+    return `rgb(${p.map((v, i) => Math.round(v + (q[i] - v) * f)).join(',')})`;
+  };
+
+  // 두 원 사이 점성 연결부의 굵기 (px). 0이면 그리지 않는다
+  // - 결합한 짝: 멀어질수록 가늘어지다가 분리 거리(BREAK_RATIO) 직전에 끊어진다
+  // - 끌려오는 짝: 가까워질수록 굵어진다
+  function bridgeWidth(a, b, isLinked) {
+    const ra = a.render;
+    const rb = b.render;
+    const reach = a.r * ra.k + b.r * rb.k;
+    const dist = Math.hypot(rb.x - ra.x, rb.y - ra.y);
+    const minR = Math.min(a.r * ra.k, b.r * rb.k);
+    if (isLinked) {
+      const f = clamp01((BREAK_RATIO - dist / reach) / (BREAK_RATIO - REST_RATIO));
+      return minR * BRIDGE_WIDTH * f ** 0.8;
+    }
+    const pull = clamp01(1 - (dist - reach) / (ATTRACT_GAP * u));
+    return minR * BRIDGE_WIDTH * 0.75 * pull * pull;
+  }
+
+  let lastRender = performance.now();
   function render(t, nearPairs) {
+    const now = performance.now();
+    const fdt = Math.min(0.1, Math.max(0, (now - lastRender) / 1000));
+    lastRender = now;
+    const ease = (tau) => 1 - Math.exp(-fdt / tau); // 프레임 속도와 무관한 부드러운 추종
     const groups = clusters(nearPairs).sort((g1, g2) => Math.max(...g1.map((b) => b.z)) - Math.max(...g2.map((b) => b.z)));
     const nearSet = new Set(nearPairs.flat());
 
@@ -479,7 +532,13 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
       const pool = groupAt(gi);
       const merged = group.length > 1;
       const hot = group.some((b) => b.hover || b.dragging) || group.some((b) => nearSet.has(b));
-      const rejected = group.some((b) => b.rejectUntil > t);
+      // 결합 정도·들어 올림은 버블마다 부드럽게 따라가 무리가 바뀌어도 모양·그림자가 튀지 않는다
+      for (const b of group) {
+        b.goo += ((merged ? 1 : 0) - b.goo) * ease(0.14);
+        b.lift += ((hot ? 1 : 0) - b.lift) * ease(0.12);
+      }
+      const goo = Math.max(...group.map((b) => b.goo));
+      const lift = Math.max(...group.map((b) => b.lift));
       // 등장·퇴장: 무리 전체가 무게중심을 기준으로 함께 0.95 ↔ 1 크기, 0 ↔ 1 투명도 (blob 모양 유지)
       const show = group.reduce((sum, b) => sum + b.show, 0) / group.length;
       const k = APPEAR_SCALE + (1 - APPEAR_SCALE) * show;
@@ -498,9 +557,10 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
         b.render.o = show;
       }
 
-      pool.blur.setAttribute('stdDeviation', String((merged ? GOO_BLUR : 2) * u * k));
-      pool.erode.setAttribute('radius', String((hot ? STROKE_HOVER : STROKE) * u));
-      pool.flood.setAttribute('flood-color', rejected ? REJECT_GREY : LIME);
+      pool.blur.setAttribute('stdDeviation', String((2 + (GOO_BLUR - 2) * goo) * u * k));
+      // 채움: 결합 정도(goo)에 따라 #f8ffe6 → #ebffb6. 외곽선: hover 등에서 아주 살짝 굵게
+      pool.fill.setAttribute('flood-color', mixColor(FILL, FILL_MERGED, goo));
+      pool.erode.setAttribute('radius', (STROKE_WIDTH + (STROKE_WIDTH_HOT - STROKE_WIDTH) * lift).toFixed(2));
       pool.g.style.display = show > 0.001 ? '' : 'none';
       pool.g.style.opacity = show.toFixed(3);
       // 맨 위 무리가 SVG에서도 마지막에 그려지도록
@@ -513,7 +573,32 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
         c.setAttribute('cy', b.render.y.toFixed(1));
         c.setAttribute('r', (b.r * breath * k).toFixed(1));
       });
-      for (let ci = group.length; ci < pool.circles.length; ci++) pool.circles[ci].style.display = 'none';
+
+      // 점성 연결부: 두 원 사이에 작은 원을 줄지어 놓으면 흐림·임계값을 거쳐 한 가닥의 액체 목처럼 이어진다
+      let ci = group.length;
+      if (merged) {
+        const inGroup = new Set(group);
+        const pairs = [];
+        for (const l of links.values()) if (inGroup.has(l.a) && inGroup.has(l.b)) pairs.push([l.a, l.b, true]);
+        for (const [a, b] of nearPairs) if (inGroup.has(a) && inGroup.has(b) && !linked(a, b)) pairs.push([a, b, false]);
+        for (const [a, b, isLinked] of pairs) {
+          const w = bridgeWidth(a, b, isLinked);
+          if (w < 1.5) continue;
+          const ra = a.render;
+          const rb = b.render;
+          const steps = 9;
+          for (let i = 1; i < steps; i++) {
+            const f = i / steps;
+            const taper = 0.8 + 0.4 * Math.abs(f - 0.5); // 가운데가 조금 더 가늘게
+            const c = circleIn(pool, ci++);
+            c.style.display = '';
+            c.setAttribute('cx', (ra.x + (rb.x - ra.x) * f).toFixed(1));
+            c.setAttribute('cy', (ra.y + (rb.y - ra.y) * f).toFixed(1));
+            c.setAttribute('r', (w * taper).toFixed(1));
+          }
+        }
+      }
+      for (; ci < pool.circles.length; ci++) pool.circles[ci].style.display = 'none';
     });
     for (let gi = groups.length; gi < groupPool.length; gi++) groupPool[gi].g.style.display = 'none';
 
@@ -526,39 +611,102 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
       b.el.style.zIndex = String(b.z);
     }
 
-    // 실루엣: 결합한 두 원의 가운데. 생길 때 서서히 나타나고, 무리와 함께 퇴장
-    const now = performance.now();
-    for (const link of links.values()) {
-      const { a, b, overlay } = link;
-      const ra = a.render;
-      const rb = b.render;
-      const k = Math.min(ra.k, rb.k);
-      const show = Math.min(ra.o, rb.o);
-      const mx = (ra.x + rb.x) / 2;
-      const my = (ra.y + rb.y) / 2;
-      if (overlay) {
-        const size = DNA_RADIUS * u * 1.1 * k; // 실루엣 크기는 의자 이미지 기준 (원 크기와 무관)
-        overlay.style.width = overlay.style.height = `${size}px`;
-        overlay.style.transform = `translate3d(${(mx - size / 2).toFixed(1)}px, ${(my - size / 2).toFixed(1)}px, 0)`;
-        overlay.style.opacity = (show * Math.min(1, (now - link.born) / 600)).toFixed(3);
-        overlay.style.zIndex = String(Math.max(a.z, b.z) + 1);
-        for (const im of overlay.children) {
-          const c = byId.get(im.dataset.id).shape;
-          if (!c) continue;
-          const aw = c.alpha[2] - c.alpha[0];
-          const ah = c.alpha[3] - c.alpha[1];
-          const s = Math.min(size / aw, size / ah);
-          Object.assign(im.style, {
-            width: `${c.size[0] * s}px`,
-            height: `${c.size[1] * s}px`,
-            left: `${size / 2 - ((c.alpha[0] + c.alpha[2]) / 2) * s}px`,
-            top: `${size / 2 - ((c.alpha[1] + c.alpha[3]) / 2) * s}px`,
-          });
-        }
+    updateXrays(ease);
+    layoutLabels(now);
+  }
+
+  // ---------- 엑스레이: 결합한 무리 안에 의자 구조를 반투명하게 겹쳐 보여 준다 ----------
+  // - 두 의자: 두 원 사이(목 부분)에 두 의자의 엑스레이를 겹쳐서. 3/3 강한 결합이면 기존 라임 실루엣 겹침도 함께
+  // - 세 의자 이상: 대표 연결 하나(3/3 강한 결합 우선, 없으면 가장 최근 결합)의 두 의자만, 그 목 부분에 조금 작고 옅게 (단순화)
+  // - 결합하면 fade in + 살짝 커지며 등장, 분리되면 fade out. 의자 이미지(버블 레이어)보다 아래에 있어 의자를 가리지 않는다
+  const xrays = new Map(); // 무리 키 → { el, members(보여 줄 두 의자), many, strong, alpha, target }
+  const xrayRects = []; // 이번 프레임 엑스레이 영역 (키워드 배치에서 피함)
+  const XRAY_TONES = ['mint', 'cyan'];
+
+  function buildXray(x) {
+    x.el.replaceChildren();
+    x.el.classList.toggle('is-many', x.many);
+    x.el.classList.toggle('is-strong', x.strong);
+    const add = (b, className) => {
+      const im = document.createElement('img');
+      im.className = className;
+      im.src = b.src;
+      im.alt = '';
+      im.dataset.id = b.id;
+      x.el.append(im);
+    };
+    if (x.strong) for (const b of x.members) add(b, 'dna-overlay__img'); // 3/3: 라임 실루엣 겹침 (기존 연출)
+    x.members.forEach((b, i) => add(b, `dna-xray__img dna-xray__img--${XRAY_TONES[i]}`));
+  }
+
+  function updateXrays(ease) {
+    const live = new Set();
+    for (const members of clusters([])) {
+      if (members.length < 2) continue;
+      const key = members.map((b) => b.id).sort().join('|');
+      live.add(key);
+      const set = new Set(members);
+      // 대표 연결: 3/3 강한 결합 → 가장 최근 결합
+      const pick = [...links.values()]
+        .filter((l) => set.has(l.a))
+        .sort((p, q) => (q.shared.count === 3) - (p.shared.count === 3) || q.born - p.born)[0];
+      const pair = [pick.a, pick.b];
+      const strong = pick.shared.count === 3;
+      const many = members.length > 2;
+      let x = xrays.get(key);
+      if (!x) {
+        const el = document.createElement('div');
+        el.className = 'dna-overlay dna-xray';
+        overlayLayer.append(el);
+        x = { el, members: pair, many, strong, alpha: 0, target: 1 };
+        xrays.set(key, x);
+        buildXray(x);
+      } else if (x.strong !== strong || x.many !== many || x.members[0] !== pair[0] || x.members[1] !== pair[1]) {
+        Object.assign(x, { members: pair, many, strong });
+        buildXray(x);
       }
+      x.target = 1;
     }
 
-    layoutLabels(now);
+    xrayRects.length = 0;
+    for (const [key, x] of xrays) {
+      if (!live.has(key)) x.target = 0; // 분리: 서서히 사라짐
+      x.alpha += (x.target - x.alpha) * ease(x.target ? 0.28 : 0.2);
+      if (!x.target && x.alpha < 0.01) {
+        x.el.remove();
+        xrays.delete(key);
+        continue;
+      }
+      const { members } = x;
+      const k = Math.min(...members.map((b) => b.render.k));
+      const show = Math.min(...members.map((b) => b.render.o));
+      const cx = members.reduce((s, b) => s + b.render.x, 0) / members.length;
+      const cy = members.reduce((s, b) => s + b.render.y, 0) / members.length;
+      const size = DNA_RADIUS * u * (x.many ? 0.78 : 0.92) * k; // 의자 이미지 기준 크기
+      // 두 의자를 떼어 놓으며 늘이는 동안에는 옅어져 점성 연결부가 보이게 (원래 간격 → 지름의 1.2배에서 사라짐)
+      const [a, b] = members;
+      const stretch = Math.hypot(b.render.x - a.render.x, b.render.y - a.render.y) / (a.r * a.render.k + b.r * b.render.k);
+      const tight = clamp01((1.2 - stretch) / (1.2 - 0.95));
+      const vis = x.alpha * tight;
+      const scale = 0.86 + 0.14 * vis; // 등장할 때 살짝 커지며
+      x.el.style.width = x.el.style.height = `${size}px`;
+      x.el.style.transform = `translate3d(${(cx - size / 2).toFixed(1)}px, ${(cy - size / 2).toFixed(1)}px, 0) scale(${scale.toFixed(3)})`;
+      x.el.style.opacity = (vis * show).toFixed(3);
+      for (const im of x.el.children) {
+        const c = byId.get(im.dataset.id).shape;
+        if (!c) continue;
+        const aw = c.alpha[2] - c.alpha[0];
+        const ah = c.alpha[3] - c.alpha[1];
+        const s = Math.min(size / aw, size / ah);
+        Object.assign(im.style, {
+          width: `${c.size[0] * s}px`,
+          height: `${c.size[1] * s}px`,
+          left: `${size / 2 - ((c.alpha[0] + c.alpha[2]) / 2) * s}px`,
+          top: `${size / 2 - ((c.alpha[1] + c.alpha[3]) / 2) * s}px`,
+        });
+      }
+      if (vis > 0.2) xrayRects.push(rectAt(cx, cy, size * scale, size * scale));
+    }
   }
 
   // ---------- 공통 키워드 배치 ----------
@@ -719,18 +867,14 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
   }
 
   function layoutLabels(now) {
-    // 가리지 말아야 할 것: 의자 이미지(투명 여백 제외)와 강한 결합의 실루엣
+    // 가리지 말아야 할 것: 의자 이미지(투명 여백 제외)와 엑스레이·실루엣 겹침
     const obstacles = [];
     for (const b of bubbles) {
       if (b.render.o < 0.01 || !b.chairHalf) continue;
       const { x, y, k } = b.render;
       obstacles.push(rectAt(x, y, b.chairHalf.w * 2 * k, b.chairHalf.h * 2 * k));
     }
-    for (const l of links.values()) {
-      if (!l.overlay) continue;
-      const size = DNA_RADIUS * u * 1.1 * Math.min(l.a.render.k, l.b.render.k);
-      obstacles.push(rectAt((l.a.render.x + l.b.render.x) / 2, (l.a.render.y + l.b.render.y) / 2, size, size));
-    }
+    obstacles.push(...xrayRects);
 
     const placed = [];
     const targets = new Map(); // 연결 → { x, y, compact, visible }

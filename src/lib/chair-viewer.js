@@ -3,6 +3,10 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { applyChairMaterials, textureSetNames } from './chair-materials.js';
 import { loadTextureSets } from './texture-sets.js';
 
@@ -32,6 +36,15 @@ const DEFAULT_RENDER = {
   keyLight: 0.8, // 키 라이트 (그림자)
   fillLight: 0.25, // 보조광: 그림자 쪽 면을 살짝 들어 올림
   rimLight: 0.6, // 림 라이트: 뒤쪽 위에서 윤곽선을 살린다
+  // 부품끼리 드리우는 그림자 (self-shadow): 키 라이트가 가려진 부분에서 키 라이트를 얼마나 덜어 낼지 0~1.
+  //   HDRI·보조광은 그대로라 그림자 속도 검게 꺼지지 않는다. 바닥 그림자 진하기는 이 값과 무관하게 이전과 같다.
+  selfShadow: 0.65,
+  // 접촉 그림자 (GTAO, 화면 공간 앰비언트 오클루전): 부품이 가깝게 맞닿거나 겹치는 틈을 은은하게 어둡게
+  //   ao: 세기 0~1 (0이면 끔), aoRadius: 그림자가 번지는 거리 (모델 크기 대비 비율)
+  ao: 0.6,
+  aoRadius: 0.18,
+  aoFloor: 0.3, // 다리·발이 바닥에 닿는 곳의 접촉 그림자 진하기 (0~1)
+  shadowSoftness: 6, // 키 라이트 그림자 번짐 (VSM 블러 반경). 작을수록 가는 프레임·와이어 그림자가 또렷하게 남는다
 };
 
 /**
@@ -77,8 +90,12 @@ export async function createChairViewer({ canvas, container, modelUrl, view, ren
 
   const model = gltf.scene;
   const partGraft = partSource ? await graftPartData(model, partSource) : null;
+  // 부품이 그림자를 드리우고(cast) 받기도(receive) 해서, 좌판 아래·프레임이 등받이에 드리우는 그림자 같은 self-shadow가 생긴다
   model.traverse((obj) => {
-    if (obj.isMesh) obj.castShadow = true;
+    if (obj.isMesh) {
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+    }
   });
   limitTextureSize(model, Math.min(MAX_TEXTURE_SIZE, renderer.capabilities.maxTextureSize));
   const materialReport = applyChairMaterials(model, materials, renderer, textureSets);
@@ -96,9 +113,11 @@ export async function createChairViewer({ canvas, container, modelUrl, view, ren
   sun.target.position.copy(center);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.radius = 12;
+  sun.shadow.radius = look.shadowSoftness;
   sun.shadow.blurSamples = 24;
   sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = radius * 0.002; // 곡면에 생기는 줄무늬(shadow acne) 방지
+  sun.shadow.intensity = look.selfShadow; // 그림자 속에서도 키 라이트 일부만 덜어 내 부드럽게
   const sc = sun.shadow.camera;
   // 분해된 부품까지 그림자가 잘리지 않도록 그림자 카메라 범위를 넉넉하게 잡는다
   sc.left = sc.bottom = -radius * 2.5;
@@ -119,12 +138,58 @@ export async function createChairViewer({ canvas, container, modelUrl, view, ren
 
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(radius * 8, radius * 8),
-    new THREE.ShadowMaterial({ opacity: 0.05 }),
+    // 그림자 세기(shadow.intensity)만큼 바닥 그림자가 옅어지므로 나눠서 보정 → 바닥 그림자는 이전과 같은 진하기
+    new THREE.ShadowMaterial({ opacity: 0.05 / Math.max(0.05, look.selfShadow) }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(center.x, box.min.y, center.z);
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // ---------- 접촉 그림자 (GTAO) ----------
+  // 장면 → GTAO(부품이 가깝게 맞닿은 틈을 은은하게 어둡게) → 톤매핑·색 공간 변환(OutputPass) 순서로 그린다.
+  // OutputPass가 렌더러의 톤매핑(Neutral)·노출·sRGB 설정을 그대로 쓰므로 기존 밝기·색은 같다.
+  // 배경은 투명 그대로(GTAO는 색만 곱하고 투명도는 건드리지 않는다). 계단 현상 방지를 위해 MSAA 4배 렌더 타깃을 쓴다.
+  let composer = null;
+  let gtao = null;
+  if (look.ao > 0) {
+    composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
+    composer.addPass(new RenderPass(scene, camera));
+    gtao = new GTAOPass(scene, camera, 1, 1, undefined, {
+      radius: radius * look.aoRadius, // 그림자가 번지는 거리 (월드 단위)
+      distanceExponent: 1.4,
+      thickness: radius * look.aoRadius, // 앞 부품 뒤로 얼마나 두꺼운 것으로 볼지 (얇은 프레임 뒤가 과하게 어두워지지 않게)
+      scale: 1,
+      samples: 16,
+      distanceFallOff: 1,
+    });
+    gtao.blendIntensity = look.ao;
+    // 섞는 방식: 의자 색은 AO만큼 곱해 어둡게(기존과 같음) + 투명한 바닥에서는 AO만큼 옅은 회색을 더해 다리·발이 바닥에 닿는 접촉 그림자를 보이게
+    //   (원래는 색만 곱해서 투명한 바닥 위에서는 접촉 그림자가 보이지 않는다)
+    gtao.blendMaterial.uniforms.floorStrength = { value: look.aoFloor };
+    gtao.blendMaterial.fragmentShader = /* glsl */ `
+      uniform float intensity;
+      uniform float floorStrength;
+      uniform sampler2D tDiffuse;
+      varying vec2 vUv;
+      void main() {
+        float ao = mix(1.0, texture2D(tDiffuse, vUv).r, intensity);
+        gl_FragColor = vec4(vec3(ao), (1.0 - ao) * floorStrength);
+      }`;
+    // 색: 결과 = 기존 색 × ao / 투명도: 결과 = 기존 + (1 - 기존) × 접촉 그림자 (불투명한 의자 부분은 그대로 1)
+    Object.assign(gtao.blendMaterial, {
+      blendSrc: THREE.DstColorFactor,
+      blendDst: THREE.ZeroFactor,
+      blendSrcAlpha: THREE.OneMinusDstAlphaFactor,
+      blendDstAlpha: THREE.OneFactor,
+    });
+    gtao.blendMaterial.needsUpdate = true;
+    // AO는 화면 해상도의 절반으로 계산하고 노이즈 제거 후 원래 크기에 섞는다 (부드럽고, 고해상도 화면에서도 가볍게)
+    const setGtaoSize = gtao.setSize.bind(gtao);
+    gtao.setSize = (w, h) => setGtaoSize(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 2)));
+    composer.addPass(gtao);
+    composer.addPass(new OutputPass());
+  }
 
   // ---------- 카메라 구도 ----------
   const az = THREE.MathUtils.degToRad(view.azimuth ?? 30);
@@ -414,6 +479,10 @@ export async function createChairViewer({ canvas, container, modelUrl, view, ren
     const width = container.clientWidth;
     const height = container.clientHeight;
     renderer.setSize(width, height, false);
+    if (composer) {
+      composer.setPixelRatio(renderer.getPixelRatio());
+      composer.setSize(width, height);
+    }
 
     // 디자인 구도(초기 카메라 위치)를 기준으로 화면 배치를 계산한 뒤, 사용자가 돌려 둔 시점은 그대로 복원한다
     const saved = camera.position.clone();
@@ -463,7 +532,8 @@ export async function createChairViewer({ canvas, container, modelUrl, view, ren
   }
 
   function render() {
-    renderer.render(scene, camera);
+    if (composer) composer.render();
+    else renderer.render(scene, camera);
   }
 
   window.addEventListener('resize', layout);
@@ -521,6 +591,7 @@ export async function createChairViewer({ canvas, container, modelUrl, view, ren
     getFrame: () => frame,
     materialReport,
     partGraft, // 부품 정보 이식 결과 (partSource를 쓴 경우)
+    shading: { sun, ground, gtao, look }, // 그림자 미세 조정·비교용 (키 라이트, 바닥, 접촉 그림자 패스, 렌더 값)
   };
 }
 

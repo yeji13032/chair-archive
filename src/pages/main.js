@@ -63,16 +63,72 @@ const items = chairs.map((chair) => {
   };
 });
 
-// ---------- Floating ----------
+// ---------- Floating (무중력 부유) ----------
+// 의자마다 주기가 서로 다른 사인파 여러 개를 더해 위아래·좌우·기울기·미세한 3D 회전을 만든다.
+// 주기들이 서로 맞아떨어지지 않아 같은 왕복이 반복되지 않고, 사인파라 갑자기 멈추거나 방향이 꺾이지 않는다.
+// - 위아래: 11 ~ 23px 범위 (이전 6 ~ 12px의 약 1.9배), 좌우: 7 ~ 14px, 기울기: ±3 ~ 5°, 3D 회전: ±6° 이하
+// - 크기는 화면 크기(디자인 단위)에 맞춰 줄어들고 늘어난다 (1440 × 900 화면 기준이 위 값)
+// - 마우스를 올린 의자는 움직임을 25%로 줄여 확대 인터랙션과 부딪히지 않게
+// - CHAIR DNA 화면이 떠 있는 동안에는 계산을 쉰다
+
+const FLOAT_REF_U = Math.min(1440 / 2000, 900 / 1293); // 위 값들의 기준 화면
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+// 의자마다 같은 값이 나오는 0~1 난수 (새로고침해도 같은 움직임)
+const seeded = (i, n) => {
+  const s = Math.sin((i + 1) * 12.9898 + n * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+};
+const between = (i, n, min, max) => min + (max - min) * seeded(i, n);
+const TAU = Math.PI * 2;
 
 items.forEach((item, i) => {
-  const amplitude = 6 + ((i * 5) % 7); // 6 ~ 12px
-  const duration = 2.4 + ((i * 0.7) % 1.6); // 2.4 ~ 4.0s
+  item.drift = {
+    span: between(i, 1, 11, 23), // 위아래 이동 범위 (px)
+    sway: between(i, 2, 7, 14), // 좌우 이동 범위 (px)
+    tilt: between(i, 3, 3, 5) * (seeded(i, 4) < 0.5 ? -1 : 1), // 기울기 (°), 방향도 의자마다 다르게
+    turn: between(i, 5, 3.5, 6), // 3D 좌우 회전 (°): 정면을 알아볼 수 있을 만큼만
+    // 주기 (초): 큰 흐름 + 작은 흔들림. 이동과 회전의 주기를 서로 다르게
+    py: [between(i, 6, 5.6, 8.4), between(i, 7, 3.1, 4.4)],
+    px: [between(i, 8, 7.2, 11), between(i, 9, 4.6, 6.2)],
+    pr: [between(i, 10, 6.4, 9.6), between(i, 11, 3.6, 5.1)],
+    pt: between(i, 12, 9, 13.5),
+    phase: Array.from({ length: 7 }, (_, n) => seeded(i, 20 + n) * TAU),
+    energy: 1, // 움직임 세기 (hover 중 0.25로 부드럽게)
+  };
+});
 
-  const tl = gsap.timeline({ repeat: -1, yoyo: true, defaults: { duration, ease: 'sine.inOut' } });
-  tl.fromTo(item.float, { y: 0 }, { y: -amplitude }, 0);
-  tl.fromTo(item.shadow, { scale: 1, opacity: 1 }, { scale: 0.88, opacity: 0.7 }, 0);
-  tl.progress((i * 0.37) % 1); // 의자마다 시작 위상을 다르게
+const wave = (t, period, phase) => Math.sin((TAU * t) / period + phase);
+
+gsap.ticker.add((time, deltaMs) => {
+  // CHAIR DNA 화면만 보이는 동안에는 쉰다 (전환 중에는 계속 움직여 자연스럽게)
+  if (sectionTransition && sectionTransition.current === 1 && !sectionTransition.busy) return;
+  const u = Math.min(window.innerWidth / 2000, window.innerHeight / 1293);
+  const k = Math.min(1.4, Math.max(0.5, u / FLOAT_REF_U)) * (reducedMotion.matches ? 0.35 : 1);
+  const settle = 1 - Math.exp(-Math.min(deltaMs, 100) / 350);
+
+  for (const item of items) {
+    const d = item.drift;
+    d.energy += ((item === hovered ? 0.25 : 1) - d.energy) * settle;
+    const e = d.energy * k;
+    const { phase: p } = d;
+    // -1 ~ 1: 큰 흐름 65~70% + 작은 흔들림 30~35%
+    const fy = 0.65 * wave(time, d.py[0], p[0]) + 0.35 * wave(time, d.py[1], p[1]);
+    const fx = 0.7 * wave(time, d.px[0], p[2]) + 0.3 * wave(time, d.px[1], p[3]);
+    const fr = 0.75 * wave(time, d.pr[0], p[4]) + 0.25 * wave(time, d.pr[1], p[5]);
+    const ft = wave(time, d.pt, p[6]);
+
+    const y = (-d.span / 2 + (d.span / 2) * fy) * e; // 이전처럼 기본 위치에서 위쪽으로 떠오르는 범위
+    const x = (d.sway / 2) * fx * e;
+    const rot = d.tilt * fr * d.energy * (reducedMotion.matches ? 0.35 : 1);
+    const rotY = reducedMotion.matches ? 0 : d.turn * ft * d.energy;
+    item.float.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) perspective(900px) rotateY(${rotY.toFixed(2)}deg) rotate(${rot.toFixed(2)}deg)`;
+
+    // 그림자: 높이 떠오를수록 작고 옅게 (이전과 같은 범위: 가장 높을 때 크기 0.88, 투명도 0.7), 좌우는 의자를 조금 따라감
+    const height = ((1 - fy) / 2) * d.energy; // 0(기본 위치) ~ 1(가장 높음)
+    item.shadow.style.transform = `translateX(${(x * 0.6).toFixed(2)}px) scale(${(1 - 0.12 * height).toFixed(3)})`;
+    item.shadow.style.opacity = (1 - 0.3 * height).toFixed(3);
+  }
 });
 
 // ---------- Hover / Click (투명 PNG 영역 기준) ----------
@@ -88,6 +144,51 @@ function buildAlphaMap(item) {
   const map = new Uint8Array(canvas.width * canvas.height);
   for (let i = 0; i < map.length; i++) map[i] = data[i * 4 + 3];
   item.alphaMap = { map, width: canvas.width, height: canvas.height };
+  item.reachMap = buildReachMap(item, map, canvas.width, canvas.height);
+}
+
+// 클릭 영역: 의자 모양을 CLICK_REACH(디자인 단위)만큼 부풀린 마스크.
+// 의자 다리·프레임 사이 같은 가까운 빈 틈을 눌러도 상세 페이지로 넘어가게 한다 (hover 판정은 그대로 의자 모양)
+const CLICK_REACH = 24; // 디자인 단위 (1440 × 900 화면에서 약 17px)
+
+function buildReachMap(item, map, width, height) {
+  const r = Math.max(1, Math.round((CLICK_REACH * width) / item.chair.box.w)); // 이미지 픽셀 단위
+  const solid = (i) => (map[i] > ALPHA_HIT ? 1 : 0);
+  // 가로 → 세로 두 번의 구간 검사(누적 합)로 사각형 모양으로 부풀린다
+  const rowPass = new Uint8Array(width * height);
+  const sums = new Int32Array(Math.max(width, height) + 1);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) sums[x + 1] = sums[x] + solid(y * width + x);
+    for (let x = 0; x < width; x++) {
+      rowPass[y * width + x] = sums[Math.min(width, x + r + 1)] - sums[Math.max(0, x - r)] > 0 ? 1 : 0;
+    }
+  }
+  const reach = new Uint8Array(width * height);
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) sums[y + 1] = sums[y] + rowPass[y * width + x];
+    for (let y = 0; y < height; y++) {
+      reach[y * width + x] = sums[Math.min(height, y + r + 1)] - sums[Math.max(0, y - r)] > 0 ? 1 : 0;
+    }
+  }
+  return reach;
+}
+
+function isNearAt(item, clientX, clientY) {
+  if (!item.reachMap) return false;
+  const rect = item.img.getBoundingClientRect();
+  if (clientX < rect.left || clientX >= rect.right || clientY < rect.top || clientY >= rect.bottom) return false;
+  const { width, height } = item.alphaMap;
+  const px = Math.floor(((clientX - rect.left) / rect.width) * width);
+  const py = Math.floor(((clientY - rect.top) / rect.height) * height);
+  return item.reachMap[py * width + px] === 1;
+}
+
+// 클릭: 의자 모양을 정확히 누르면 기존과 같고, 아니면 가까운 빈 틈까지 (확대된 의자 우선)
+function clickTest(clientX, clientY) {
+  const exact = hitTest(clientX, clientY);
+  if (exact) return exact;
+  if (hovered && isNearAt(hovered, clientX, clientY)) return hovered;
+  return items.find((item) => isNearAt(item, clientX, clientY)) ?? null;
 }
 
 items.forEach((item) => {
@@ -242,7 +343,7 @@ document.documentElement.addEventListener('pointerleave', () => applyHovered(nul
 window.addEventListener('click', (event) => {
   if (event.target instanceof Element && event.target.closest('a')) return; // 네비게이션 링크 등은 기본 동작
   if (inDnaSection(event)) return;
-  const hit = hitTest(event.clientX, event.clientY);
+  const hit = clickTest(event.clientX, event.clientY);
   if (hit) window.location.href = hit.link.href;
 });
 
