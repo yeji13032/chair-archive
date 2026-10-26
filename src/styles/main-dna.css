@@ -1,3 +1,5 @@
+@import 'pretendard/dist/web/static/Pretendard-Medium.css'; /* 배경 그래픽 타이포 (500) */
+
 /*
  * CHAIR DNA 섹션 (메인 페이지 아래, public/design/dna-01-merged.webp · dna-02-default.webp 기준)
  * 좌표: 2000 × 1292 프레임. 위치는 섹션 너비·높이 비율, 크기는 디자인 단위 --u (메인 화면과 같은 방식)
@@ -14,6 +16,31 @@
   opacity: 0;
   background: var(--color-bg);
   user-select: none;
+}
+
+/* 배경 그래픽 타이포: 연한 회색의 큰 글자 (레퍼런스: 대문자 높이 80, 왼쪽 위 / 오른쪽 아래). 클릭·선택 없음 */
+.dna__display {
+  position: absolute;
+  margin: 0;
+  font-size: calc(var(--u) * 111);
+  line-height: calc(var(--u) * 151);
+  font-weight: 500;
+  letter-spacing: -0.056em;
+  color: #c2c2c2;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+.dna__display--top {
+  left: calc(var(--u) * 21);
+  top: calc(var(--u) * 50);
+}
+
+.dna__display--bottom {
+  right: calc(var(--u) * 29);
+  bottom: calc(var(--u) * -15);
+  text-align: right;
 }
 
 .dna__lines,

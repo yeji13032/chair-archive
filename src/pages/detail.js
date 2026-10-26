@@ -111,10 +111,49 @@ const actions = {
   'show-structure': (explode) => explode.show(),
   'return-to-form': (explode) => explode.hide(),
 };
-document.querySelectorAll('[data-action]').forEach((button) => {
-  button.addEventListener('click', async () => {
+const actionButtons = [...document.querySelectorAll('[data-action]')];
+
+// 클릭 피드백: 누르는 순간 0.2초 동안만 #C6FF33 (선택 상태로 고정하지 않는다. 끝나면 hover 중이면 라임, 아니면 검정)
+const PRESS_FEEDBACK = 200; // ms
+actionButtons.forEach((button) => {
+  let pressTimer = 0;
+  const flash = () => {
+    button.classList.add('is-pressed');
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => button.classList.remove('is-pressed'), PRESS_FEEDBACK);
+  };
+  button.addEventListener('pointerdown', flash);
+  button.addEventListener('click', async (event) => {
+    if (event.detail === 0) flash(); // 키보드(Enter·Space)로 누른 경우
     const explode = await explodeReady;
     actions[button.dataset.action]?.(explode);
+  });
+});
+
+// hover 확대 배율: 기본 1.2배, 커진 버튼이 옆 버튼이나 화면 가장자리에 닿으면 닿지 않는 만큼만 (거의 안 커지면 확대하지 않음)
+const HOVER_SCALE = 1.2;
+const HOVER_MARGIN = 4; // px, 커진 버튼과 이웃 사이에 남길 최소 간격
+actionButtons.forEach((button) => {
+  button.addEventListener('pointerenter', () => {
+    const parent = button.offsetParent?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const box = (el) => {
+      const left = parent.left + el.offsetLeft;
+      const top = parent.top + el.offsetTop;
+      return { left, right: left + el.offsetWidth, top, bottom: top + el.offsetHeight, width: el.offsetWidth, height: el.offsetHeight };
+    };
+    const me = box(button);
+    let scale = HOVER_SCALE;
+    const limit = (room, size) => 1 + (2 * Math.max(0, room - HOVER_MARGIN)) / size; // 한쪽으로 room만큼 커질 수 있을 때의 최대 배율
+    for (const other of actionButtons) {
+      if (other === button) continue;
+      const o = box(other);
+      if (o.left >= me.right) scale = Math.min(scale, limit(o.left - me.right, me.width));
+      else if (o.right <= me.left) scale = Math.min(scale, limit(me.left - o.right, me.width));
+      else if (o.top >= me.bottom) scale = Math.min(scale, limit(o.top - me.bottom, me.height));
+      else if (o.bottom <= me.top) scale = Math.min(scale, limit(me.top - o.bottom, me.height));
+    }
+    scale = Math.min(scale, limit(me.left, me.width), limit(window.innerWidth - me.right, me.width));
+    button.style.setProperty('--hover-scale', scale < 1.02 ? '1' : scale.toFixed(3));
   });
 });
 

@@ -16,24 +16,57 @@ import '../styles/main-dna.css';
  * 물리 계산은 화면 픽셀 기준, 크기는 디자인 단위 u(메인 화면과 같은 min(너비/2000, 높이/1293))
  */
 const SVG_NS = 'http://www.w3.org/2000/svg';
-// 버블: 미니멀한 평면 그래픽 (그림자 없음). 아주 연한 채움 + 얇은 라임 외곽선
+// 버블: 그래픽 요소 같은 평면 스타일 (그림자·글로우 없음). 거의 흰 채움 + 얇은 회색 외곽선
 // 단일 버블·결합 blob 모두 같은 필터로 칠하므로 하나의 색으로 이어진다
-const FILL = '#f8ffe6'; // 기본: 의자가 잘 보이도록 존재감을 줄인 채움
-const FILL_MERGED = '#eefec6'; // 공통 DNA로 결합하면 이 색으로 서서히 진해진다
-const STROKE_COLOR = '#b8ff00';
-const STROKE_WIDTH = 2; // px
-const STROKE_WIDTH_HOT = 2.4; // hover · 드래그 · 끌려오는 중: 아주 살짝 굵게
+const FILL = '#fcfcfc';
+const FILL_MERGED = '#fcfcfc'; // 결합해도 같은 채움 (레퍼런스)
+// 외곽선: 단일 버블·결합 blob·결합/분리 중·hover 모두 같은 색과 두께 (화면 크기와 관계없이 1px)
+const STROKE_COLOR = '#9c9c9c';
+const STROKE_WIDTH = 1; // px
 
 // 디자인 단위(2000 × 1292 프레임) 기준 값
-const GOO_BLUR = 15; // blob 연결부의 부드러움 (원끼리 이어지는 목 부분)
+const GOO_BLUR = 12; // blob 연결부의 부드러움 (원끼리 이어지는 목 부분). 작을수록 얇고 민첩한 목
 const BRIDGE_WIDTH = 0.42; // 결합한 두 원 사이 점성 있는 연결부의 최대 굵기 (작은 원 반지름 대비)
 const REST_RATIO = 0.87; // 결합 상태의 중심 거리 = 지름 × 0.87 (레퍼런스 이미지 1)
-const MERGE_RATIO = 0.98; // 중심 거리가 지름 × 0.98보다 가까워지면 결합
-const BREAK_RATIO = 1.45; // 결합된 짝을 이 거리 이상 끌어당기면 분리
-const ATTRACT_GAP = 150; // 공통점이 있는 버블이 끌리기 시작하는 외곽선 사이 거리
+const MERGE_RATIO = 1.0; // 중심 거리가 지름(두 반지름의 합)보다 가까워지면 = 외곽선이 닿는 순간 결합
+const BREAK_RATIO = 1.55; // 결합된 짝을 이 거리 이상 끌어당기면 분리 (그 전까지 점성 있는 목이 늘어난다)
+const ATTRACT_GAP = 190; // 공통점이 있는 버블이 끌리기 시작하는 외곽선 사이 거리
+const ATTRACT_FORCE = 1600; // 자석처럼 끌어당기는 힘
 const COLLIDE_GAP = 8; // 공통점이 없는 버블 사이 최소 간격
+// 움직임 감각 (스프링: 강도 STIFF, 감쇠 DAMP). 강도가 높을수록 빠르게 반응, 감쇠가 강도의 2√ 근처면 짧게 안정
+const DRAG_STIFF = 2000; // 잡은 버블이 포인터를 따라가는 스프링 (지연 약 34ms: 이전 45ms보다 즉각적이되 살짝 늦게 따라오는 탄성)
+const DRAG_DAMP = 68; // 감쇠비 약 0.76 → 멈출 때 아주 작은 탄성 여운
+const FLOAT_STIFF = 16; // 기준 위치(부유)로 돌아오는 스프링
+const MOVE_DAMP = 6.5; // 놓인 버블의 감쇠 (짧고 정제된 복원)
+const LINK_STIFF = 55; // 결합한 짝을 정해진 간격으로 붙잡는 스프링
+const LINK_DAMP = 9; // 결합한 짝의 상대 속도 감쇠 (결합 후 출렁임을 짧게)
+// 버블 형태의 탄성 (원 → 살짝 늘어난 타원 → 원). 늘어남은 반지름 대비 비율
+const STRETCH_MAX = 0.07; // 드래그 속도에 따른 늘어남 (진행 방향 앞쪽은 이것의 약 1.4배 = 최대 약 10%)
+const STRETCH_SPEED = 1200; // 이 속도(디자인 단위/초)에서 최대로 늘어남 (빠르게 끌수록 크게)
+const LEAD = 0.8; // 진행 방향 쪽은 앞으로 나오고 반대쪽은 살짝 눌리는 비대칭 (늘어남 대비)
+const RELEASE_KICK = 14; // 놓는 순간 반대로 살짝 튕겨 1~2회 출렁이게
+const SHAPE_STIFF = 260; // 형태 복원 스프링
+const SHAPE_DAMP = 9; // 형태 복원 감쇠 (1~2회 출렁였다가 약 0.5초 안에 원으로)
+// 살아 있는 세포 같은 기본 변형: 원 둘레를 따라 2·3·4개의 느린 물결 (반지름 대비, 버블마다 속도·위상이 다르다)
+const MORPH = [
+  { k: 2, amp: 0.014, speed: [0.45, 0.75] },
+  { k: 3, amp: 0.009, speed: [0.7, 1.1] },
+  { k: 4, amp: 0.005, speed: [1.0, 1.5] },
+];
+// 표면이 국소적으로 튀어나오거나(자석) 눌리는(충돌) 변형
+const BUMP_MAGNET = 0.11; // 공통점 있는 버블이 가까워질 때 서로를 향해 튀어나오는 최대 크기
+const BUMP_TENSION = 0.5; // 결합한 짝을 늘일 때 서로를 향해 늘어나는 정도
+const BUMP_WIDTH = 6; // 클수록 좁고 뾰족한 돌출 (cos^n)
+const BUMP_STIFF = 200;
+const BUMP_DAMP = 12;
+const DENT_IMPULSE = 2.4; // 충돌 지점이 눌리는 속도
+// 결합 직후 blob 전체가 잠깐 부풀었다 가라앉는 탄성 (최대 약 6%)
+const SWELL_IMPULSE = 1.4;
+const SWELL_STIFF = 220;
+const SWELL_DAMP = 11;
+const OUTLINE_POINTS = 40; // 버블 윤곽을 그리는 점 수 (gooey 흐림이 매끈하게 이어 준다)
 // 공통점 없는 버블에 부딪혔을 때 (reject): 부딪힌 버블은 크게 튕겨 나갔다가 제자리로 출렁이며 돌아오고, 잡은 버블은 크게 밀려난다
-const REJECT_IMPULSE = 1150; // 부딪힌 순간 한 번 주는 속도 (디자인 단위/초)
+const REJECT_IMPULSE = 1500; // 부딪힌 순간 한 번 주는 속도 (디자인 단위/초)
 const REJECT_KICK = 58; // 잡은 버블이 반대로 밀려나는 거리 (디자인 단위)
 const REJECT_COOLDOWN = 0.45; // 초: 이 시간 안에는 다시 튕기지 않는다 (계속 밀어도 한 번만)
 const FLOAT_AMP = 12; // 부유 진폭
@@ -106,6 +139,21 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
       pos: { x: 0, y: 0 },
       vel: { x: 0, y: 0 },
       kick: { x: 0, y: 0 }, // 튕김·끌림을 보여 주는 시각적 오프셋 (드래그 중에도 적용)
+      // 형태: 벡터 방향으로 |form|만큼 늘어난 타원 (0이면 원). formVel은 그 변화 속도, formPull은 끌리는 방향
+      form: { x: 0, y: 0 },
+      formVel: { x: 0, y: 0 },
+      formPull: { x: 0, y: 0 },
+      // 표면 변형: 국소 돌출·눌림 (상대 버블 id → { amp, vel, target, angle }), 결합 직후 부풀기
+      bumps: new Map(),
+      swell: 0,
+      swellVel: 0,
+      // 기본 물결 변형: 버블마다 다른 속도·위상 (결합해도 서로 따라가지 않게 phase와 별도)
+      morph: MORPH.map((m, n) => ({
+        k: m.k,
+        amp: m.amp * (0.8 + 0.4 * (((i + 1) * (n + 3) * 0.618) % 1)),
+        speed: m.speed[0] + (m.speed[1] - m.speed[0]) * (((i + 2) * (n + 1) * 0.381) % 1),
+        phase: (i * 2.3 + n * 1.9) % (Math.PI * 2),
+      })),
       phase: i * 1.37,
       breathPhase: i * 0.91,
       dragging: false,
@@ -194,6 +242,15 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
     links.set(linkKey(a, b), link);
     // 결합되면 같은 위상으로 함께 떠다닌다
     b.phase = a.phase;
+    // 두 방울이 합쳐지는 순간: 잠깐 부풀었다 가라앉고(swell), 이어지는 방향의 수직으로 한 번 출렁인다
+    const nx = b.pos.x - a.pos.x;
+    const ny = b.pos.y - a.pos.y;
+    const len = Math.hypot(nx, ny) || 1;
+    for (const m of [a, b]) {
+      m.swellVel += SWELL_IMPULSE;
+      m.formVel.x += (-ny / len) * 1.3;
+      m.formVel.y += (nx / len) * 1.3;
+    }
     requestAnimationFrame(() => label.classList.add('is-visible'));
   }
 
@@ -256,20 +313,92 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
         fill,
         stroke,
         erode: filter.querySelector('feMorphology'),
-        circles: [],
+        circles: [], // 연결부(점성 있는 목)
+        paths: [], // 버블 윤곽 (자유 곡선)
       });
     }
     return groupPool[i];
   }
 
+  function pathIn(group, i) {
+    while (group.paths.length <= i) {
+      const p = document.createElementNS(SVG_NS, 'path');
+      p.setAttribute('fill', '#000');
+      group.g.append(p);
+      group.paths.push(p);
+    }
+    return group.paths[i];
+  }
+
+  // 버블 윤곽: 각도 θ마다 반지름이 조금씩 다른 닫힌 곡선 (위치·충돌 판정과는 별개의 시각적 변형)
+  //   기본 물결(morph) + 늘어남(form: 2배 대칭) + 진행 방향 비대칭(lead) + 국소 돌출·눌림(bumps) + 부풀기(swell)
+  const outlineCos = Array.from({ length: OUTLINE_POINTS }, (_, i) => Math.cos((i / OUTLINE_POINTS) * Math.PI * 2));
+  const outlineSin = Array.from({ length: OUTLINE_POINTS }, (_, i) => Math.sin((i / OUTLINE_POINTS) * Math.PI * 2));
+  function bubbleOutline(b, x, y, r, t) {
+    const s = Math.hypot(b.form.x, b.form.y);
+    const fa = Math.atan2(b.form.y, b.form.x);
+    const bumps = [...b.bumps.values()].filter((m) => Math.abs(m.amp) > 0.001);
+    const swell = 1 + b.swell;
+    let d = '';
+    for (let i = 0; i < OUTLINE_POINTS; i++) {
+      const theta = (i / OUTLINE_POINTS) * Math.PI * 2;
+      let f = 0;
+      for (const m of b.morph) f += m.amp * motion.float * Math.cos(m.k * theta + m.phase + t * m.speed);
+      if (s > 0.001) {
+        const rel = theta - fa;
+        // 앞 +1.4s, 뒤 -0.2s, 옆 -0.4s: 진행 방향으로 늘어나고 반대쪽·옆은 살짝 수축 (부피감 유지)
+        f += s * (0.1 + 0.5 * Math.cos(2 * rel)) + s * LEAD * Math.cos(rel);
+      }
+      for (const m of bumps) {
+        const c = Math.cos(theta - m.angle);
+        if (c > 0) f += m.amp * c ** BUMP_WIDTH;
+      }
+      const rr = r * swell * (1 + f);
+      d += `${i ? 'L' : 'M'}${(x + rr * outlineCos[i]).toFixed(1)} ${(y + rr * outlineSin[i]).toFixed(1)}`;
+    }
+    return `${d}Z`;
+  }
+
+  // 표면 돌출·눌림: 상대 버블 쪽으로 목표값을 정한다 (매 프레임 다시 정하며, 정하지 않은 것은 0으로 돌아간다)
+  function bumpToward(b, other, amount) {
+    let m = b.bumps.get(other.id);
+    if (!m) {
+      m = { amp: 0, vel: 0, target: 0, angle: 0 };
+      b.bumps.set(other.id, m);
+    }
+    m.target = Math.max(m.target, amount);
+  }
+  function dent(b, other, impulse) {
+    bumpToward(b, other, 0);
+    b.bumps.get(other.id).vel -= impulse;
+  }
+
+  // 무리 안의 도형 (버블은 늘어날 수 있도록 타원, 연결부는 원으로 쓴다)
   function circleIn(group, i) {
     while (group.circles.length <= i) {
-      const c = document.createElementNS(SVG_NS, 'circle');
+      const c = document.createElementNS(SVG_NS, 'ellipse');
       c.setAttribute('fill', '#000');
       group.g.append(c);
       group.circles.push(c);
     }
     return group.circles[i];
+  }
+
+  // 중심 (x, y), 반지름 r, 형태 벡터 shape(방향으로 |shape|만큼 늘어남; 수직 방향은 그 절반만큼 줄어 부피감 유지)
+  function setBlobShape(c, x, y, r, shape) {
+    const s = shape ? Math.hypot(shape.x, shape.y) : 0;
+    c.setAttribute('cx', x.toFixed(1));
+    c.setAttribute('cy', y.toFixed(1));
+    if (s < 0.002) {
+      c.setAttribute('rx', r.toFixed(1));
+      c.setAttribute('ry', r.toFixed(1));
+      c.removeAttribute('transform');
+      return;
+    }
+    const angle = (Math.atan2(shape.y, shape.x) * 180) / Math.PI;
+    c.setAttribute('rx', (r * (1 + s)).toFixed(1));
+    c.setAttribute('ry', (r * (1 - s * 0.5)).toFixed(1));
+    c.setAttribute('transform', `rotate(${angle.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})`);
   }
 
   // ---------- 크기 변화 ----------
@@ -338,6 +467,12 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
     const { b } = drag;
     b.dragging = false;
     b.el.classList.remove('is-dragging');
+    // 놓는 순간의 속도는 조금만 남겨, 툭 멈추지 않고 살짝 미끄러지다 제자리로 돌아오게
+    b.vel.x *= 0.35;
+    b.vel.y *= 0.35;
+    // 늘어나 있던 형태를 반대쪽으로 살짝 튕겨, 1~2회 가볍게 출렁인 뒤 원으로 돌아오게
+    b.formVel.x -= b.form.x * RELEASE_KICK;
+    b.formVel.y -= b.form.y * RELEASE_KICK;
     // 놓은 자리를 새 기준 위치로 (연결된 무리 전체)
     for (const group of clusters([])) {
       if (!group.includes(b)) continue;
@@ -361,25 +496,32 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
     simT += dt;
     const t = simT;
 
-    // 1) 드래그한 버블은 포인터를 부드럽게 따라간다
+    // 1) 드래그한 버블은 포인터를 탄성 스프링으로 따라간다 (즉각 반응 + 아주 살짝 늦게 따라오는 여운)
+    //    프레임이 느려도(저사양·바쁜 탭) 흔들리지 않도록 1/120초 단위로 나눠 계산하고, 감쇠는 안정적인 암시적 방식으로
     if (drag) {
       const { b } = drag;
       const tx = drag.x + drag.dx;
       const ty = drag.y + drag.dy;
-      const k = 1 - Math.exp(-dt * 22);
-      const nx = b.pos.x + (tx - b.pos.x) * k;
-      const ny = b.pos.y + (ty - b.pos.y) * k;
-      b.vel = { x: (nx - b.pos.x) / dt, y: (ny - b.pos.y) / dt };
-      b.pos = { x: nx, y: ny };
+      const steps = Math.max(1, Math.ceil(dt * 120));
+      const h = dt / steps;
+      for (let i = 0; i < steps; i++) {
+        b.vel.x = (b.vel.x + (tx - b.pos.x) * DRAG_STIFF * h) / (1 + DRAG_DAMP * h);
+        b.vel.y = (b.vel.y + (ty - b.pos.y) * DRAG_STIFF * h) / (1 + DRAG_DAMP * h);
+        b.pos.x += b.vel.x * h;
+        b.pos.y += b.vel.y * h;
+      }
     }
 
     // 2) 부유: 기준 위치 주변의 느린 원 운동으로 끌어당김 (드래그 중이 아닌 버블)
     for (const b of bubbles) {
+      b.formPull.x = 0;
+      b.formPull.y = 0;
+      for (const m of b.bumps.values()) m.target = 0; // 이번 프레임에 다시 정하지 않으면 원래대로
       if (b.dragging) continue;
       const fx = b.home.x + Math.sin(t * 0.55 + b.phase) * FLOAT_AMP * u * motion.float;
       const fy = b.home.y + Math.cos(t * 0.43 + b.phase * 1.3) * FLOAT_AMP * u * motion.float;
-      b.vel.x += (fx - b.pos.x) * 7 * dt;
-      b.vel.y += (fy - b.pos.y) * 7 * dt;
+      b.vel.x += (fx - b.pos.x) * FLOAT_STIFF * dt;
+      b.vel.y += (fy - b.pos.y) * FLOAT_STIFF * dt;
     }
 
     // 3) 쌍별 상호작용
@@ -400,9 +542,17 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
           // 결합: 정해진 간격을 유지하는 스프링. 한쪽을 멀리 끌면 분리
           if ((a.dragging || b.dragging) && dist > d0 * BREAK_RATIO) {
             removeLink(key);
+            // 점성 있게 늘어났던 목이 끊기는 순간: 두 버블이 끊어진 방향으로 살짝 튕기듯 출렁인다
+            for (const m of [a, b]) {
+              m.formVel.x += nx * 1.6;
+              m.formVel.y += ny * 1.6;
+            }
             continue;
           }
-          const f = (dist - d0 * REST_RATIO) * 26 * dt;
+          // 정해진 간격으로 붙잡는 스프링 + 상대 속도 감쇠(출렁임을 짧게). 멀리 끌수록 힘은 일정 이상 커지지 않아 떼어 낼 수 있다
+          const stretch = Math.min(dist - d0 * REST_RATIO, d0 * 0.22);
+          const relVel = (b.vel.x - a.vel.x) * nx + (b.vel.y - a.vel.y) * ny;
+          const f = (stretch * LINK_STIFF + relVel * LINK_DAMP) * dt;
           if (!a.dragging) {
             a.vel.x += nx * f;
             a.vel.y += ny * f;
@@ -411,6 +561,17 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
             b.vel.x -= nx * f;
             b.vel.y -= ny * f;
           }
+          // 늘어나 있는 동안 서로를 향해 살짝 늘어난 형태 (액체의 긴장감)
+          const over = Math.max(0, dist / (d0 * REST_RATIO) - 1);
+          const tension = over * 0.12;
+          a.formPull.x += nx * tension;
+          a.formPull.y += ny * tension;
+          b.formPull.x -= nx * tension;
+          b.formPull.y -= ny * tension;
+          // 떼어 낼수록 서로를 향한 표면이 끌려 나와 연결부가 길게 늘어나 보인다
+          const reach = Math.min(0.14, over * BUMP_TENSION);
+          bumpToward(a, b, reach);
+          bumpToward(b, a, reach);
           continue;
         }
 
@@ -422,13 +583,22 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
           // near match: 공통점이 있으면 자석처럼 끌어당긴다
           const other = dragged === a ? b : a;
           const pull = Math.max(0, 1 - gap / (ATTRACT_GAP * u));
-          const s = (other === b ? -1 : 1) * 900 * u * pull * pull * dt;
+          const s = (other === b ? -1 : 1) * ATTRACT_FORCE * u * pull * pull * dt;
           other.vel.x += nx * s;
           other.vel.y += ny * s;
-          // 잡은 버블도 살짝 끌려가 보이게 (시각적 오프셋)
-          const sk = (dragged === a ? 1 : -1) * 18 * u * pull;
-          dragged.kick.x += (nx * sk - dragged.kick.x) * 0.2;
-          dragged.kick.y += (ny * sk - dragged.kick.y) * 0.2;
+          // 잡은 버블도 끌려가 보이게 (시각적 오프셋)
+          const sk = (dragged === a ? 1 : -1) * 24 * u * pull;
+          dragged.kick.x += (nx * sk - dragged.kick.x) * 0.35;
+          dragged.kick.y += (ny * sk - dragged.kick.y) * 0.35;
+          // 가까워질수록 서로를 향해 늘어나는 형태
+          const lean = pull * 0.04;
+          a.formPull.x += nx * lean;
+          a.formPull.y += ny * lean;
+          b.formPull.x -= nx * lean;
+          b.formPull.y -= ny * lean;
+          // 서로를 향한 표면이 액체처럼 돌출 (가까울수록 크게)
+          bumpToward(a, b, pull * pull * BUMP_MAGNET);
+          bumpToward(b, a, pull * pull * BUMP_MAGNET);
           nearPairs.push([a, b]);
           if (dist < d0 * MERGE_RATIO) addLink(a, b);
           continue;
@@ -445,6 +615,7 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
             const share2 = overlap / movers.length;
             m.pos.x += nx * sign * share2;
             m.pos.y += ny * sign * share2;
+            if (m.dragging) continue; // 잡은 버블은 위치만 밀려나고 속도는 포인터 스프링이 정한다 (튕겨 날아가지 않게)
             const bounce = 260 * u * (overlap / (d0 * 0.2) + 0.4);
             m.vel.x += nx * sign * bounce * dt * 6;
             m.vel.y += ny * sign * bounce * dt * 6;
@@ -456,6 +627,14 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
               const other = dragged === a ? b : a;
               other.vel.x -= nx * sign * REJECT_IMPULSE * u;
               other.vel.y -= ny * sign * REJECT_IMPULSE * u;
+              // 부딪힌 면이 눌렸다가(옆으로 퍼졌다가) 되돌아오는 탄성
+              for (const m of [a, b]) {
+                m.formVel.x += -ny * 2.6;
+                m.formVel.y += nx * 2.6;
+              }
+              // 부딪힌 지점이 안쪽으로 눌렸다가 탄성 있게 복원
+              dent(a, b, DENT_IMPULSE);
+              dent(b, a, DENT_IMPULSE);
               dragged.kick.x = nx * sign * REJECT_KICK * u;
               dragged.kick.y = ny * sign * REJECT_KICK * u;
             }
@@ -465,12 +644,43 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
       }
     }
 
-    // 4) 적분 + 감쇠 + 화면 경계
+    // 4) 형태: 움직이는 방향으로 살짝 늘어나고(+끌리는 쪽으로), 멈추면 스프링으로 짧게 출렁이며 원으로 돌아온다
     for (const b of bubbles) {
-      b.kick.x *= Math.exp(-dt * 7);
-      b.kick.y *= Math.exp(-dt * 7);
+      const speed = Math.hypot(b.vel.x, b.vel.y);
+      const amount = Math.min(STRETCH_MAX, (speed / (STRETCH_SPEED * u)) * STRETCH_MAX);
+      // 가만히 있을 때도 아주 미세하게 살아 있는 긴장감 (±1.2%)
+      const idle = 0.006 * motion.float; // 기본 물결(morph)과 함께 아주 작게
+      let tx = (speed > 1 ? (b.vel.x / speed) * amount : 0) + b.formPull.x + Math.cos(t * 1.3 + b.phase) * idle;
+      let ty = (speed > 1 ? (b.vel.y / speed) * amount : 0) + b.formPull.y + Math.sin(t * 1.1 + b.phase * 1.7) * idle;
+      const len = Math.hypot(tx, ty);
+      if (len > STRETCH_MAX * 1.4) {
+        tx *= (STRETCH_MAX * 1.4) / len;
+        ty *= (STRETCH_MAX * 1.4) / len;
+      }
+      b.formVel.x = (b.formVel.x + (tx - b.form.x) * SHAPE_STIFF * dt) / (1 + SHAPE_DAMP * dt);
+      b.formVel.y = (b.formVel.y + (ty - b.form.y) * SHAPE_STIFF * dt) / (1 + SHAPE_DAMP * dt);
+      b.form.x += b.formVel.x * dt;
+      b.form.y += b.formVel.y * dt;
+
+      // 국소 돌출·눌림: 상대 버블 방향을 따라가며 스프링으로 목표에 다가간다 (끝나면 정리)
+      for (const [id, m] of b.bumps) {
+        const o = byId.get(id);
+        m.angle = Math.atan2(o.pos.y - b.pos.y, o.pos.x - b.pos.x);
+        m.vel = (m.vel + (m.target - m.amp) * BUMP_STIFF * dt) / (1 + BUMP_DAMP * dt);
+        m.amp += m.vel * dt;
+        if (m.target === 0 && Math.abs(m.amp) < 0.0005 && Math.abs(m.vel) < 0.01) b.bumps.delete(id);
+      }
+      // 결합 직후 부풀기
+      b.swellVel = (b.swellVel - b.swell * SWELL_STIFF * dt) / (1 + SWELL_DAMP * dt);
+      b.swell += b.swellVel * dt;
+    }
+
+    // 5) 적분 + 감쇠 + 화면 경계
+    for (const b of bubbles) {
+      b.kick.x *= Math.exp(-dt * 9);
+      b.kick.y *= Math.exp(-dt * 9);
       if (b.dragging) continue;
-      const damp = Math.exp(-dt * 4.2);
+      const damp = Math.exp(-dt * MOVE_DAMP);
       b.vel.x *= damp;
       b.vel.y *= damp;
       b.pos.x += b.vel.x * dt;
@@ -516,7 +726,7 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
       return minR * BRIDGE_WIDTH * f ** 0.8;
     }
     const pull = clamp01(1 - (dist - reach) / (ATTRACT_GAP * u));
-    return minR * BRIDGE_WIDTH * 0.75 * pull * pull;
+    return minR * BRIDGE_WIDTH * 0.85 * pull ** 1.5; // 조금 더 일찍 목이 생겨 서로 끌려가는 긴장감
   }
 
   let lastRender = performance.now();
@@ -534,11 +744,10 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
       const hot = group.some((b) => b.hover || b.dragging) || group.some((b) => nearSet.has(b));
       // 결합 정도·들어 올림은 버블마다 부드럽게 따라가 무리가 바뀌어도 모양·그림자가 튀지 않는다
       for (const b of group) {
-        b.goo += ((merged ? 1 : 0) - b.goo) * ease(0.14);
+        b.goo += ((merged ? 1 : 0) - b.goo) * ease(0.08); // 결합 모양이 더 민첩하게 이어지고 풀린다
         b.lift += ((hot ? 1 : 0) - b.lift) * ease(0.12);
       }
       const goo = Math.max(...group.map((b) => b.goo));
-      const lift = Math.max(...group.map((b) => b.lift));
       // 등장·퇴장: 무리 전체가 무게중심을 기준으로 함께 0.95 ↔ 1 크기, 0 ↔ 1 투명도 (blob 모양 유지)
       const show = group.reduce((sum, b) => sum + b.show, 0) / group.length;
       const k = APPEAR_SCALE + (1 - APPEAR_SCALE) * show;
@@ -558,24 +767,24 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
       }
 
       pool.blur.setAttribute('stdDeviation', String((2 + (GOO_BLUR - 2) * goo) * u * k));
-      // 채움: 결합 정도(goo)에 따라 #f8ffe6 → #ebffb6. 외곽선: hover 등에서 아주 살짝 굵게
+      // 채움: 결합 정도(goo)에 따라 FILL → FILL_MERGED (현재 둘 다 #fcfcfc)
       pool.fill.setAttribute('flood-color', mixColor(FILL, FILL_MERGED, goo));
-      pool.erode.setAttribute('radius', (STROKE_WIDTH + (STROKE_WIDTH_HOT - STROKE_WIDTH) * lift).toFixed(2));
+      // 외곽선은 모든 상태에서 같은 색·두께 (필터 생성 시 값 그대로: #9c9c9c, 1px)
       pool.g.style.display = show > 0.001 ? '' : 'none';
       pool.g.style.opacity = show.toFixed(3);
       // 맨 위 무리가 SVG에서도 마지막에 그려지도록
       svg.append(pool.g);
-      group.forEach((b, ci) => {
+      // 버블 윤곽: 숨쉬기 + 유기적 변형이 들어간 자유 곡선 (의자 이미지는 별도 레이어라 왜곡되지 않는다)
+      group.forEach((b, pi) => {
         const breath = 1 + Math.sin(t * 0.8 + b.breathPhase) * BREATH;
-        const c = circleIn(pool, ci);
-        c.style.display = '';
-        c.setAttribute('cx', b.render.x.toFixed(1));
-        c.setAttribute('cy', b.render.y.toFixed(1));
-        c.setAttribute('r', (b.r * breath * k).toFixed(1));
+        const p = pathIn(pool, pi);
+        p.style.display = '';
+        p.setAttribute('d', bubbleOutline(b, b.render.x, b.render.y, b.r * breath * k, t));
       });
+      for (let pi = group.length; pi < pool.paths.length; pi++) pool.paths[pi].style.display = 'none';
 
       // 점성 연결부: 두 원 사이에 작은 원을 줄지어 놓으면 흐림·임계값을 거쳐 한 가닥의 액체 목처럼 이어진다
-      let ci = group.length;
+      let ci = 0;
       if (merged) {
         const inGroup = new Set(group);
         const pairs = [];
@@ -592,9 +801,7 @@ export function mountChairDna(section = document.querySelector('[data-dna]')) {
             const taper = 0.8 + 0.4 * Math.abs(f - 0.5); // 가운데가 조금 더 가늘게
             const c = circleIn(pool, ci++);
             c.style.display = '';
-            c.setAttribute('cx', (ra.x + (rb.x - ra.x) * f).toFixed(1));
-            c.setAttribute('cy', (ra.y + (rb.y - ra.y) * f).toFixed(1));
-            c.setAttribute('r', (w * taper).toFixed(1));
+            setBlobShape(c, ra.x + (rb.x - ra.x) * f, ra.y + (rb.y - ra.y) * f, w * taper, null);
           }
         }
       }

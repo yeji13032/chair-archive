@@ -181,16 +181,24 @@ body[data-page='detail'] .site-nav {
   background: var(--swatch);
 }
 
-/* SHOW STRUCTURE / RETURN TO FORM: 기준선 985, 가로로 나란히 */
+/* SHOW STRUCTURE / RETURN TO FORM: 테두리 상자 버튼을 세로로 (레퍼런스: 위쪽 y 937, 119 × 31, 테두리 1px, 간격 10, 글자 가운데) */
 .detail-actions {
-  top: calc(var(--oy) + var(--d) * (985 - var(--action) * 0.855));
+  top: calc(var(--oy) + var(--d) * 937);
   display: flex;
-  gap: calc(var(--d) * 21);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--d) * 10);
 }
 
 .detail-action {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--d) * 119);
+  height: calc(var(--d) * 31);
   padding: 0;
-  border: 0;
+  border: 1px solid #000000;
   background: none;
   color: #000000;
   font-family: inherit;
@@ -200,11 +208,23 @@ body[data-page='detail'] .site-nav {
   letter-spacing: -0.015em;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.25s ease;
+  transform-origin: center;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1); /* 색은 즉시 바뀌고, 크기만 부드럽게 */
 }
 
-.detail-action:hover {
-  color: var(--detail-hover);
+/* 기본은 항상 검정. hover 중이거나 누르는 순간(0.2초, detail.js의 is-pressed)에만 #C6FF33.
+   클릭 뒤 포커스가 남아도 색은 바뀌지 않는다 (키보드 포커스 표시는 브라우저 기본 외곽선). */
+.detail-action.is-pressed,
+.detail-action:active {
+  color: #c6ff33;
+}
+
+/* hover: 라임 글자 + 가운데를 기준으로 부드럽게 확대. 배율은 detail.js가 옆 버튼·화면 가장자리와 겹치지 않게 계산(--hover-scale, 최대 1.2) */
+@media (hover: hover) {
+  .detail-action:hover {
+    color: #c6ff33;
+    transform: scale(var(--hover-scale, 1.2));
+  }
 }
 
 /* ---------- 작은 화면: 3D 의자를 위에, 설명과 버튼을 아래에 ---------- */
@@ -303,10 +323,13 @@ body[data-page='detail'] .site-nav {
 
   .detail-actions {
     margin-top: 36px;
-    gap: 20px;
+    gap: 10px;
   }
 
+  /* 같은 테두리 상자 버튼을 손가락으로 누르기 쉬운 크기로 */
   .detail-action {
+    width: 150px;
+    height: 36px;
     font-size: 12px;
     line-height: 12px;
   }
